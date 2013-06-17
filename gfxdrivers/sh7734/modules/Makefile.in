@@ -1,0 +1,39 @@
+
+ifneq ($(KERNELRELEASE),)
+
+obj-m		+= sh_2dg.o sh_du.o
+
+else
+
+prefix		:= @prefix@
+KERNELDIR	?= /lib/modules/$(shell uname -r)/build
+PWD		:= $(shell pwd)
+KERNELRELEASE	:= $(shell cat $(KERNELDIR)/include/config/kernel.release)
+MODINSTDIR	:= $(prefix)/lib/modules/$(KERNELRELEASE)/extra
+
+all:
+	$(MAKE) -C $(KERNELDIR) M=$(PWD) modules
+
+clean:
+	$(MAKE) -C $(KERNELDIR) M=$(PWD) clean
+
+install:
+	$(MAKE) INSTALL_MOD_PATH=$(prefix) -C $(KERNELDIR) M=$(PWD) modules_install
+	@rm -f .installed
+	@for mod in $(wildcard *.ko); do \
+		echo $(MODINSTDIR)/$${mod} >> .installed; \
+	done
+
+uninstall:
+	@if [ -f .installed ]; then \
+		rm -f $(shell cat .installed); \
+		rm -f .installed; \
+	fi
+
+distdir:
+distclean:
+
+.PHONY: all clean install uninstall dist distclean
+
+endif
+

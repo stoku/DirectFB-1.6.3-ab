@@ -14,6 +14,8 @@
 # PARTICULAR PURPOSE.
 
 @SET_MAKE@
+
+
 VPATH = @srcdir@
 am__make_dryrun = \
   { \
@@ -51,8 +53,9 @@ POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
 target_triplet = @target@
-subdir = gfxdrivers
-DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
+DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in \
+	$(top_srcdir)/rules/libobject.make
+subdir = gfxdrivers/sh7734
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/as-ac-expand.m4 \
 	$(top_srcdir)/m4/libtool.m4 $(top_srcdir)/m4/ltoptions.m4 \
@@ -64,14 +67,76 @@ mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = $(top_builddir)/config.h
 CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
-AM_V_GEN = $(am__v_GEN_@AM_V@)
-am__v_GEN_ = $(am__v_GEN_@AM_DEFAULT_V@)
-am__v_GEN_0 = @echo "  GEN   " $@;
+am__vpath_adj_setup = srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`;
+am__vpath_adj = case $$p in \
+    $(srcdir)/*) f=`echo "$$p" | sed "s|^$$srcdirstrip/||"`;; \
+    *) f=$$p;; \
+  esac;
+am__strip_dir = f=`echo $$p | sed -e 's|^.*/||'`;
+am__install_max = 40
+am__nobase_strip_setup = \
+  srcdirstrip=`echo "$(srcdir)" | sed 's/[].[^$$\\*|]/\\\\&/g'`
+am__nobase_strip = \
+  for p in $$list; do echo "$$p"; done | sed -e "s|$$srcdirstrip/||"
+am__nobase_list = $(am__nobase_strip_setup); \
+  for p in $$list; do echo "$$p $$p"; done | \
+  sed "s| $$srcdirstrip/| |;"' / .*\//!s/ .*/ ./; s,\( .*\)/[^/]*$$,\1,' | \
+  $(AWK) 'BEGIN { files["."] = "" } { files[$$2] = files[$$2] " " $$1; \
+    if (++n[$$2] == $(am__install_max)) \
+      { print $$2, files[$$2]; n[$$2] = 0; files[$$2] = "" } } \
+    END { for (dir in files) print dir, files[dir] }'
+am__base_list = \
+  sed '$$!N;$$!N;$$!N;$$!N;$$!N;$$!N;$$!N;s/\n/ /g' | \
+  sed '$$!N;$$!N;$$!N;$$!N;s/\n/ /g'
+am__uninstall_files_from_dir = { \
+  test -z "$$files" \
+    || { test ! -d "$$dir" && test ! -f "$$dir" && test ! -r "$$dir"; } \
+    || { echo " ( cd '$$dir' && rm -f" $$files ")"; \
+         $(am__cd) "$$dir" && rm -f $$files; }; \
+  }
+am__installdirs = "$(DESTDIR)$(sh7734dir)" "$(DESTDIR)$(sh7734dir)"
+LTLIBRARIES = $(sh7734_LTLIBRARIES)
+libdirectfb_sh7734_la_DEPENDENCIES =  \
+	$(top_builddir)/lib/direct/libdirect.la \
+	$(top_builddir)/src/libdirectfb.la
+am_libdirectfb_sh7734_la_OBJECTS = sh7734.lo sh_2dg_gfx.lo \
+	sh_du_screen.lo sh_du_layer.lo
+libdirectfb_sh7734_la_OBJECTS = $(am_libdirectfb_sh7734_la_OBJECTS)
+AM_V_lt = $(am__v_lt_@AM_V@)
+am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
+am__v_lt_0 = --silent
+libdirectfb_sh7734_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
+	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
+	$(AM_CFLAGS) $(CFLAGS) $(libdirectfb_sh7734_la_LDFLAGS) \
+	$(LDFLAGS) -o $@
+DEFAULT_INCLUDES = -I.@am__isrc@ -I$(top_builddir)
+depcomp = $(SHELL) $(top_srcdir)/depcomp
+am__depfiles_maybe = depfiles
+am__mv = mv -f
+COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
+	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
+LTCOMPILE = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) \
+	$(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) \
+	$(AM_CFLAGS) $(CFLAGS)
+AM_V_CC = $(am__v_CC_@AM_V@)
+am__v_CC_ = $(am__v_CC_@AM_DEFAULT_V@)
+am__v_CC_0 = @echo "  CC    " $@;
 AM_V_at = $(am__v_at_@AM_V@)
 am__v_at_ = $(am__v_at_@AM_DEFAULT_V@)
 am__v_at_0 = @
-SOURCES =
-DIST_SOURCES =
+CCLD = $(CC)
+LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
+	$(AM_LDFLAGS) $(LDFLAGS) -o $@
+AM_V_CCLD = $(am__v_CCLD_@AM_V@)
+am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
+am__v_CCLD_0 = @echo "  CCLD  " $@;
+AM_V_GEN = $(am__v_GEN_@AM_V@)
+am__v_GEN_ = $(am__v_GEN_@AM_DEFAULT_V@)
+am__v_GEN_0 = @echo "  GEN   " $@;
+SOURCES = $(libdirectfb_sh7734_la_SOURCES)
+DIST_SOURCES = $(libdirectfb_sh7734_la_SOURCES)
 RECURSIVE_TARGETS = all-recursive check-recursive dvi-recursive \
 	html-recursive info-recursive install-data-recursive \
 	install-dvi-recursive install-exec-recursive \
@@ -84,6 +149,7 @@ am__can_run_installinfo = \
     n|no|NO) false;; \
     *) (install-info --version) >/dev/null 2>&1;; \
   esac
+DATA = $(sh7734_DATA)
 RECURSIVE_CLEAN_TARGETS = mostlyclean-recursive clean-recursive	\
   distclean-recursive maintainer-clean-recursive
 AM_RECURSIVE_TARGETS = $(RECURSIVE_TARGETS:-recursive=) \
@@ -91,9 +157,7 @@ AM_RECURSIVE_TARGETS = $(RECURSIVE_TARGETS:-recursive=) \
 	distdir
 ETAGS = etags
 CTAGS = ctags
-DIST_SUBDIRS = ati128 cle266 cyber5k davinci ep9x gl gles2 i810 i830 \
-	mach64 matrox neomagic nsc nvidia omap pvr2d pxa3xx radeon \
-	savage sh772x sis315 tdfx unichrome vdpau vmware sh7734
+DIST_SUBDIRS = $(SUBDIRS)
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 am__relativize = \
   dir0=`pwd`; \
@@ -351,90 +415,53 @@ target_vendor = @target_vendor@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-@GFX_ATI128_FALSE@ATI128_DIR = 
-@GFX_ATI128_TRUE@ATI128_DIR = ati128
-@GFX_CLE266_FALSE@CLE266_DIR = 
-@GFX_CLE266_TRUE@CLE266_DIR = cle266
-@GFX_CYBER5K_FALSE@CYBER5K_DIR = 
-@GFX_CYBER5K_TRUE@CYBER5K_DIR = cyber5k
-@GFX_DAVINCI_FALSE@DAVINCI_DIR = 
-@GFX_DAVINCI_TRUE@DAVINCI_DIR = davinci
-@GFX_GL_FALSE@GL_DIR = 
-@GFX_GL_TRUE@GL_DIR = gl
-@GFX_GLES2_FALSE@GLES2_DIR = 
-@GFX_GLES2_TRUE@GLES2_DIR = gles2
-@GFX_I810_FALSE@I810_DIR = 
-@GFX_I810_TRUE@I810_DIR = i810
-@GFX_I830_FALSE@I830_DIR = 
-@GFX_I830_TRUE@I830_DIR = i830
-@GFX_MACH64_FALSE@MACH64_DIR = 
-@GFX_MACH64_TRUE@MACH64_DIR = mach64
-@GFX_MATROX_FALSE@MATROX_DIR = 
-@GFX_MATROX_TRUE@MATROX_DIR = matrox
-@GFX_NEOMAGIC_FALSE@NEOMAGIC_DIR = 
-@GFX_NEOMAGIC_TRUE@NEOMAGIC_DIR = neomagic
-@GFX_NSC_FALSE@NSC_DIR = 
-@GFX_NSC_TRUE@NSC_DIR = nsc
-@GFX_NVIDIA_FALSE@NVIDIA_DIR = 
-@GFX_NVIDIA_TRUE@NVIDIA_DIR = nvidia
-@GFX_OMAP_FALSE@OMAP_DIR = 
-@GFX_OMAP_TRUE@OMAP_DIR = omap
-@GFX_PVR2D_FALSE@PVR2D_DIR = 
-@GFX_PVR2D_TRUE@PVR2D_DIR = pvr2d
-@GFX_PXA3XX_FALSE@PXA3XX_DIR = 
-@GFX_PXA3XX_TRUE@PXA3XX_DIR = pxa3xx
-@GFX_RADEON_FALSE@RADEON_DIR = 
-@GFX_RADEON_TRUE@RADEON_DIR = radeon
-@GFX_SAVAGE_FALSE@SAVAGE_DIR = 
-@GFX_SAVAGE_TRUE@SAVAGE_DIR = savage
-@GFX_SH772X_FALSE@SH772X_DIR = 
-@GFX_SH772X_TRUE@SH772X_DIR = sh772x
-@GFX_SIS315_FALSE@SIS315_DIR = 
-@GFX_SIS315_TRUE@SIS315_DIR = sis315
-@GFX_TDFX_FALSE@TDFX_DIR = 
-@GFX_TDFX_TRUE@TDFX_DIR = tdfx
-@GFX_UNICHROME_FALSE@UNICHROME_DIR = 
-@GFX_UNICHROME_TRUE@UNICHROME_DIR = unichrome
-@GFX_VDPAU_FALSE@VDPAU_DIR = 
-@GFX_VDPAU_TRUE@VDPAU_DIR = vdpau
-@GFX_VMWARE_FALSE@VMWARE_DIR = 
-@GFX_VMWARE_TRUE@VMWARE_DIR = vmware
-@GFX_EP9X_FALSE@EP9X_DIR = 
-@GFX_EP9X_TRUE@EP9X_DIR = ep9x
-@GFX_SH7734_FALSE@SH7734_DIR = 
-@GFX_SH7734_TRUE@SH7734_DIR = sh7734
-SUBDIRS = \
-	$(ATI128_DIR)	\
-	$(CLE266_DIR)	\
-	$(CYBER5K_DIR)	\
-	$(DAVINCI_DIR)	\
-	$(EP9X_DIR)	\
-	$(GL_DIR)	\
-	$(GLES2_DIR)	\
-	$(I810_DIR)	\
-	$(I830_DIR)	\
-	$(MACH64_DIR)	\
-	$(MATROX_DIR)	\
-	$(NEOMAGIC_DIR)	\
-	$(NSC_DIR)	\
-	$(NVIDIA_DIR)	\
-	$(OMAP_DIR)	\
-	$(PVR2D_DIR)	\
-	$(PXA3XX_DIR)	\
-	$(RADEON_DIR)	\
-	$(SAVAGE_DIR)	\
-	$(SH772X_DIR)	\
-	$(SIS315_DIR)	\
-	$(TDFX_DIR)	\
-	$(UNICHROME_DIR) \
-	$(VDPAU_DIR)	\
-	$(VMWARE_DIR)	\
-	$(SH7734_DIR)
+SUBDIRS = modules
+EXTRA_DIST = \
+	README.sh7734		\
+	directfbrc.sh7734	\
+	modules/Makefile.in	\
+	modules/sh_2dg.c	\
+	modules/sh_2dg.h	\
+	modules/sh_du.c		\
+	modules/sh_du.h
+
+INCLUDES = \
+	-I$(top_builddir)/include	\
+	-I$(top_builddir)/lib		\
+	-I$(top_srcdir)/include		\
+	-I$(top_srcdir)/lib		\
+	-I$(top_srcdir)/src		\
+	-I$(top_srcdir)/systems
+
+sh7734_LTLIBRARIES = libdirectfb_sh7734.la
+@BUILD_STATIC_TRUE@sh7734_DATA = $(sh7734_LTLIBRARIES:.la=.o)
+sh7734dir = $(MODULEDIR)/gfxdrivers
+libdirectfb_sh7734_la_SOURCES = \
+	sh7734.c	\
+	sh_gfx.h	\
+	sh_2dg_gfx.c	\
+	sh_2dg_gfx.h	\
+	sh_2dg_reg.h	\
+	sh_du_screen.c	\
+	sh_du_screen.h	\
+        sh_du_layer.c	\
+        sh_du_layer.h	\
+	sh_du_reg.h
+
+libdirectfb_sh7734_la_LDFLAGS = \
+	-module		\
+	-avoid-version	\
+	$(DFB_LDFLAGS)
+
+libdirectfb_sh7734_la_LIBADD = \
+	$(top_builddir)/lib/direct/libdirect.la	\
+	$(top_builddir)/src/libdirectfb.la
 
 all: all-recursive
 
 .SUFFIXES:
-$(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am  $(am__configure_deps)
+.SUFFIXES: .c .lo .o .obj
+$(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am $(top_srcdir)/rules/libobject.make $(am__configure_deps)
 	@for dep in $?; do \
 	  case '$(am__configure_deps)' in \
 	    *$$dep*) \
@@ -443,9 +470,9 @@ $(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am  $(am__confi
 	      exit 1;; \
 	  esac; \
 	done; \
-	echo ' cd $(top_srcdir) && $(AUTOMAKE) --gnu gfxdrivers/Makefile'; \
+	echo ' cd $(top_srcdir) && $(AUTOMAKE) --gnu gfxdrivers/sh7734/Makefile'; \
 	$(am__cd) $(top_srcdir) && \
-	  $(AUTOMAKE) --gnu gfxdrivers/Makefile
+	  $(AUTOMAKE) --gnu gfxdrivers/sh7734/Makefile
 .PRECIOUS: Makefile
 Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 	@case '$?' in \
@@ -455,6 +482,7 @@ Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 	    echo ' cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@ $(am__depfiles_maybe)'; \
 	    cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@ $(am__depfiles_maybe);; \
 	esac;
+$(top_srcdir)/rules/libobject.make:
 
 $(top_builddir)/config.status: $(top_srcdir)/configure $(CONFIG_STATUS_DEPENDENCIES)
 	cd $(top_builddir) && $(MAKE) $(AM_MAKEFLAGS) am--refresh
@@ -464,12 +492,99 @@ $(top_srcdir)/configure: @MAINTAINER_MODE_TRUE@ $(am__configure_deps)
 $(ACLOCAL_M4): @MAINTAINER_MODE_TRUE@ $(am__aclocal_m4_deps)
 	cd $(top_builddir) && $(MAKE) $(AM_MAKEFLAGS) am--refresh
 $(am__aclocal_m4_deps):
+install-sh7734LTLIBRARIES: $(sh7734_LTLIBRARIES)
+	@$(NORMAL_INSTALL)
+	@list='$(sh7734_LTLIBRARIES)'; test -n "$(sh7734dir)" || list=; \
+	list2=; for p in $$list; do \
+	  if test -f $$p; then \
+	    list2="$$list2 $$p"; \
+	  else :; fi; \
+	done; \
+	test -z "$$list2" || { \
+	  echo " $(MKDIR_P) '$(DESTDIR)$(sh7734dir)'"; \
+	  $(MKDIR_P) "$(DESTDIR)$(sh7734dir)" || exit 1; \
+	  echo " $(LIBTOOL) $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=install $(INSTALL) $(INSTALL_STRIP_FLAG) $$list2 '$(DESTDIR)$(sh7734dir)'"; \
+	  $(LIBTOOL) $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=install $(INSTALL) $(INSTALL_STRIP_FLAG) $$list2 "$(DESTDIR)$(sh7734dir)"; \
+	}
+
+uninstall-sh7734LTLIBRARIES:
+	@$(NORMAL_UNINSTALL)
+	@list='$(sh7734_LTLIBRARIES)'; test -n "$(sh7734dir)" || list=; \
+	for p in $$list; do \
+	  $(am__strip_dir) \
+	  echo " $(LIBTOOL) $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=uninstall rm -f '$(DESTDIR)$(sh7734dir)/$$f'"; \
+	  $(LIBTOOL) $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=uninstall rm -f "$(DESTDIR)$(sh7734dir)/$$f"; \
+	done
+
+clean-sh7734LTLIBRARIES:
+	-test -z "$(sh7734_LTLIBRARIES)" || rm -f $(sh7734_LTLIBRARIES)
+	@list='$(sh7734_LTLIBRARIES)'; for p in $$list; do \
+	  dir="`echo $$p | sed -e 's|/[^/]*$$||'`"; \
+	  test "$$dir" != "$$p" || dir=.; \
+	  echo "rm -f \"$${dir}/so_locations\""; \
+	  rm -f "$${dir}/so_locations"; \
+	done
+libdirectfb_sh7734.la: $(libdirectfb_sh7734_la_OBJECTS) $(libdirectfb_sh7734_la_DEPENDENCIES) $(EXTRA_libdirectfb_sh7734_la_DEPENDENCIES) 
+	$(AM_V_CCLD)$(libdirectfb_sh7734_la_LINK) -rpath $(sh7734dir) $(libdirectfb_sh7734_la_OBJECTS) $(libdirectfb_sh7734_la_LIBADD) $(LIBS)
+
+mostlyclean-compile:
+	-rm -f *.$(OBJEXT)
+
+distclean-compile:
+	-rm -f *.tab.c
+
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sh7734.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sh_2dg_gfx.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sh_du_layer.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sh_du_screen.Plo@am__quote@
+
+.c.o:
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(COMPILE) -c $<
+
+.c.obj:
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ `$(CYGPATH_W) '$<'`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(COMPILE) -c `$(CYGPATH_W) '$<'`
+
+.c.lo:
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LTCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$<' object='$@' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LTCOMPILE) -c -o $@ $<
 
 mostlyclean-libtool:
 	-rm -f *.lo
 
 clean-libtool:
 	-rm -rf .libs _libs
+install-sh7734DATA: $(sh7734_DATA)
+	@$(NORMAL_INSTALL)
+	@list='$(sh7734_DATA)'; test -n "$(sh7734dir)" || list=; \
+	if test -n "$$list"; then \
+	  echo " $(MKDIR_P) '$(DESTDIR)$(sh7734dir)'"; \
+	  $(MKDIR_P) "$(DESTDIR)$(sh7734dir)" || exit 1; \
+	fi; \
+	for p in $$list; do \
+	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
+	  echo "$$d$$p"; \
+	done | $(am__base_list) | \
+	while read files; do \
+	  echo " $(INSTALL_DATA) $$files '$(DESTDIR)$(sh7734dir)'"; \
+	  $(INSTALL_DATA) $$files "$(DESTDIR)$(sh7734dir)" || exit $$?; \
+	done
+
+uninstall-sh7734DATA:
+	@$(NORMAL_UNINSTALL)
+	@list='$(sh7734_DATA)'; test -n "$(sh7734dir)" || list=; \
+	files=`for p in $$list; do echo $$p; done | sed -e 's|^.*/||'`; \
+	dir='$(DESTDIR)$(sh7734dir)'; $(am__uninstall_files_from_dir)
 
 # This directory's subdirectories are mostly independent; you can cd
 # into them and run `make' without going through this Makefile.
@@ -663,9 +778,12 @@ distdir: $(DISTFILES)
 	done
 check-am: all-am
 check: check-recursive
-all-am: Makefile
+all-am: Makefile $(LTLIBRARIES) $(DATA)
 installdirs: installdirs-recursive
 installdirs-am:
+	for dir in "$(DESTDIR)$(sh7734dir)" "$(DESTDIR)$(sh7734dir)"; do \
+	  test -z "$$dir" || $(MKDIR_P) "$$dir"; \
+	done
 install: install-recursive
 install-exec: install-exec-recursive
 install-data: install-data-recursive
@@ -698,11 +816,14 @@ maintainer-clean-generic:
 	@echo "it deletes files that may require special tools to rebuild."
 clean: clean-recursive
 
-clean-am: clean-generic clean-libtool mostlyclean-am
+clean-am: clean-generic clean-libtool clean-sh7734LTLIBRARIES \
+	mostlyclean-am
 
 distclean: distclean-recursive
+	-rm -rf ./$(DEPDIR)
 	-rm -f Makefile
-distclean-am: clean-am distclean-generic distclean-tags
+distclean-am: clean-am distclean-compile distclean-generic \
+	distclean-tags
 
 dvi: dvi-recursive
 
@@ -716,7 +837,7 @@ info: info-recursive
 
 info-am:
 
-install-data-am:
+install-data-am: install-sh7734DATA install-sh7734LTLIBRARIES
 
 install-dvi: install-dvi-recursive
 
@@ -745,12 +866,14 @@ install-ps-am:
 installcheck-am:
 
 maintainer-clean: maintainer-clean-recursive
+	-rm -rf ./$(DEPDIR)
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic
 
 mostlyclean: mostlyclean-recursive
 
-mostlyclean-am: mostlyclean-generic mostlyclean-libtool
+mostlyclean-am: mostlyclean-compile mostlyclean-generic \
+	mostlyclean-libtool
 
 pdf: pdf-recursive
 
@@ -760,25 +883,36 @@ ps: ps-recursive
 
 ps-am:
 
-uninstall-am:
+uninstall-am: uninstall-sh7734DATA uninstall-sh7734LTLIBRARIES
 
 .MAKE: $(RECURSIVE_CLEAN_TARGETS) $(RECURSIVE_TARGETS) ctags-recursive \
 	install-am install-strip tags-recursive
 
 .PHONY: $(RECURSIVE_CLEAN_TARGETS) $(RECURSIVE_TARGETS) CTAGS GTAGS \
 	all all-am check check-am clean clean-generic clean-libtool \
-	ctags ctags-recursive distclean distclean-generic \
-	distclean-libtool distclean-tags distdir dvi dvi-am html \
-	html-am info info-am install install-am install-data \
-	install-data-am install-dvi install-dvi-am install-exec \
-	install-exec-am install-html install-html-am install-info \
-	install-info-am install-man install-pdf install-pdf-am \
-	install-ps install-ps-am install-strip installcheck \
-	installcheck-am installdirs installdirs-am maintainer-clean \
-	maintainer-clean-generic mostlyclean mostlyclean-generic \
-	mostlyclean-libtool pdf pdf-am ps ps-am tags tags-recursive \
-	uninstall uninstall-am
+	clean-sh7734LTLIBRARIES ctags ctags-recursive distclean \
+	distclean-compile distclean-generic distclean-libtool \
+	distclean-tags distdir dvi dvi-am html html-am info info-am \
+	install install-am install-data install-data-am install-dvi \
+	install-dvi-am install-exec install-exec-am install-html \
+	install-html-am install-info install-info-am install-man \
+	install-pdf install-pdf-am install-ps install-ps-am \
+	install-sh7734DATA install-sh7734LTLIBRARIES install-strip \
+	installcheck installcheck-am installdirs installdirs-am \
+	maintainer-clean maintainer-clean-generic mostlyclean \
+	mostlyclean-compile mostlyclean-generic mostlyclean-libtool \
+	pdf pdf-am ps ps-am tags tags-recursive uninstall uninstall-am \
+	uninstall-sh7734DATA uninstall-sh7734LTLIBRARIES
 
+%.o: .libs/%.a %.la
+	rm -f $<.tmp/*.o
+	if test -d $<.tmp; then rmdir $<.tmp; fi
+	mkdir $<.tmp
+	(cd $<.tmp && $(AR) x ../../$<)
+	$(LD) -o $@ -r $<.tmp/*.o
+	rm -f $<.tmp/*.o && rmdir $<.tmp
+
+.PHONY: $(LTLIBRARIES:%.la=.libs/%.a)
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

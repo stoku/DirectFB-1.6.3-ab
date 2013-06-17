@@ -150,6 +150,11 @@ else
 EP9X_DIR =
 endif
 
+if GFX_SH7734
+SH7734_DIR = sh7734
+else
+SH7734_DIR =
+endif
 
 SUBDIRS = \
 	$(ATI128_DIR)	\
@@ -176,4 +181,5 @@ SUBDIRS = \
 	$(TDFX_DIR)	\
 	$(UNICHROME_DIR) \
 	$(VDPAU_DIR)	\
-	$(VMWARE_DIR)
+	$(VMWARE_DIR)	\
+	$(SH7734_DIR)

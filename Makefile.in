@@ -58,9 +58,10 @@ DIST_COMMON = README $(am__configure_deps) $(srcdir)/Makefile.am \
 	$(srcdir)/Makefile.in $(srcdir)/config.h.in \
 	$(srcdir)/directfb-config.in $(srcdir)/directfb-internal.pc.in \
 	$(srcdir)/directfb.pc.in $(srcdir)/directfb.spec.in \
-	$(top_srcdir)/configure AUTHORS COPYING ChangeLog INSTALL NEWS \
-	TODO compile config.guess config.sub depcomp install-sh \
-	ltmain.sh missing
+	$(top_srcdir)/configure \
+	$(top_srcdir)/gfxdrivers/sh7734/modules/Makefile.in AUTHORS \
+	COPYING ChangeLog INSTALL NEWS TODO compile config.guess \
+	config.sub depcomp install-sh ltmain.sh missing
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/as-ac-expand.m4 \
 	$(top_srcdir)/m4/libtool.m4 $(top_srcdir)/m4/ltoptions.m4 \
@@ -73,7 +74,7 @@ am__CONFIG_DISTCLEAN_FILES = config.status config.cache config.log \
 mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = config.h
 CONFIG_CLEAN_FILES = directfb-config directfb.pc directfb-internal.pc \
-	directfb.spec
+	directfb.spec gfxdrivers/sh7734/modules/Makefile
 CONFIG_CLEAN_VPATH_FILES =
 am__vpath_adj_setup = srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`;
 am__vpath_adj = case $$p in \
@@ -502,6 +503,8 @@ directfb.pc: $(top_builddir)/config.status $(srcdir)/directfb.pc.in
 directfb-internal.pc: $(top_builddir)/config.status $(srcdir)/directfb-internal.pc.in
 	cd $(top_builddir) && $(SHELL) ./config.status $@
 directfb.spec: $(top_builddir)/config.status $(srcdir)/directfb.spec.in
+	cd $(top_builddir) && $(SHELL) ./config.status $@
+gfxdrivers/sh7734/modules/Makefile: $(top_builddir)/config.status $(top_srcdir)/gfxdrivers/sh7734/modules/Makefile.in
 	cd $(top_builddir) && $(SHELL) ./config.status $@
 install-binSCRIPTS: $(bin_SCRIPTS)
 	@$(NORMAL_INSTALL)

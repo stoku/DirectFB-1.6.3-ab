@@ -1,0 +1,6 @@
+
+system	     = devmem
+video-phys   = 0b000000	# Requires 'mem=48M' kernel option!!!!!
+video-length = 16777216	# 16MB of physically contiguous memory for acceleration
+accelerator  = 7734	# SH7734 (2DG + DU)
+

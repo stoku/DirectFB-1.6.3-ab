@@ -1,0 +1,22 @@
+
+following environment variables are required for building DirectFB
+
+PATH		path including directory to the cross compiler tools
+		[$(buildroot)/output/host/usr/bin:$(PATH)]
+STAGINGDIR	staging root directory [$(buildroot)/output/staging]
+
+following environment variables are required for building kernel modues
+
+KERNELDIR	linux kernel source directory [$(linux)]
+ARCH		CPU archtecture [sh]
+CROSS_COMPILE	cross compiler prefix [sh4a-linux-]
+
+> autoreconf -fi
+> ./configure --prefix=$STAGINGDIR/usr/local \
+              --host=sh4a-linux \
+              --with-gfxdrivers=sh7734 \
+              --with-inputdrivers=ps2mouse,keyboard,linuxinput \
+              --disable-fddev
+> make
+> make install
+

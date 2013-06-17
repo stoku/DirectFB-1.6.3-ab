@@ -36,3 +36,12 @@ stamp-h1
 stamp-h.in
 *.orig
 *.rej
+
+*.ko
+*.cmd
+*.mod.c
+.tmp_versions
+Module.symvers
+modules.order
+/gfxdrivers/sh7734/modules/.installed
+!/gfxdrivers/sh7734/modules/Makefile.in
