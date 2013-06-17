@@ -653,6 +653,7 @@ key_event( const struct input_event *levt,
 
           devt->type = levt->value ? DIET_KEYPRESS : DIET_KEYRELEASE;
 
+#if 0 /* let keymap set id and symbols */
           if (DFB_KEY_TYPE(key) == DIKT_IDENTIFIER) {
                devt->key_id = key;
                devt->flags |= DIEF_KEYID;
@@ -661,6 +662,7 @@ key_event( const struct input_event *levt,
                devt->key_symbol = key;
                devt->flags |= DIEF_KEYSYMBOL;
           }
+#endif
 
           devt->flags |= DIEF_KEYCODE;
           devt->key_code = code;
