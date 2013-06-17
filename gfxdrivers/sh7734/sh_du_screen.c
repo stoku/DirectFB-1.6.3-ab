@@ -115,7 +115,6 @@ update_layers( const SHGfxDriverData *drv,
      reg.value  = 0u;
      for (i = 0; i < 8; i++)
           reg.value |= (u32)(screen->layer.values[i] & 0x0F) << (4 * i);
-     D_INFO( "SH-DU/Screen: DPPR = 0x%08x\n", reg.value );
 
      return SH_DU_WRITE( drv->dpy_fd, reg );
 }

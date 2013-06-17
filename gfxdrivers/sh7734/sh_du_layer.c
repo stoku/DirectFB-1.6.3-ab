@@ -616,8 +616,6 @@ sh_du_set_region( CoreLayer                  *layer,
                lyr->plane.pa0 = left_lock->phys;
                SH_DU_PLANE_SET_DIRTY( dirty, PA0 );
           }
-          D_INFO( "SH-DU/Layer %d: set surface 0x%08x (stride = %d)\n",
-                  lyr->id, lyr->plane.pa0, lyr->plane.stride );
      }
 
      /* area */
@@ -842,9 +840,6 @@ sh_du_flip_region( CoreLayer             *layer,
      ret = update_layer( drv, lyr, PLANE_PA0, NULL );
      if (ret)
           goto out;
-
-     D_INFO( "SH-DU/Layer %d: flip surface 0x%08x (stride = %d)\n",
-             lyr->id, lyr->plane.pa0, lyr->plane.stride );
 
      if (D_FLAGS_IS_SET( flags, DSFLIP_WAIT ))
           ret = dfb_layer_wait_vsync( layer );

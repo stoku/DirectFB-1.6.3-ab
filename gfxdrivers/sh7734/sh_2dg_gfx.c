@@ -730,7 +730,7 @@ sh_2dg_engine_reset( void *driver_data, void *device_data )
      SH2dgDeviceData  *dev;
 
      D_DEBUG_AT( SH_2DG_GFX, "%s()\n", __FUNCTION__ );
-     D_INFO( "SH 2DG Graphics Engine Reset\n");
+     D_INFO( "SH-2DG/Graphics: Engine Reset\n");
 
      drv = (SHGfxDriverData *)driver_data;
      dev = (SH2dgDeviceData *)device_data;
