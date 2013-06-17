@@ -1705,6 +1705,8 @@ dfb_input_create_device(int device_index, CoreDFB *core_in, void *driver_in)
      else if (device_info.desc.min_keycode >= 0 && device_info.desc.max_keycode >= 0)
           allocate_device_keymap( device->core, device );
 
+     init_axes( device );
+
      /* add it into local device list and shared dev array */
      D_DEBUG_AT(Core_Input,
                 "In master, add a new device with dev_id=%d\n",
@@ -1856,6 +1858,9 @@ dfb_input_remove_device(int device_index, void *driver_in)
      fusion_skirmish_destroy( &shared->lock );
 
      fusion_reactor_free( shared->reactor );
+
+     if (shared->axis_info)
+          SHFREE( pool, shared->axis_info );
 
      if (shared->keymap.entries)
           SHFREE( pool, shared->keymap.entries );
