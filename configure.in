@@ -1763,6 +1763,9 @@ if test "$checkfor_linux_input" = "yes"; then
          [Define to 1 if struct input_absinfo is defined in linux/input.h.])
        AC_MSG_RESULT(yes),
        AC_MSG_RESULT(no))
+    PKG_CHECK_MODULES([LIBUDEV], [libudev],
+       AC_DEFINE(HAVE_LIBUDEV, 1, [Define to 1 if you have the `udev' library (-ludev).]),
+       AC_MSG_WARN([linuxinput will be build without libudev.]))
   fi
 fi
 
@@ -2408,7 +2411,7 @@ Building Input Drivers:
   Input Hub                 $enable_input_hub
   Joystick                  $enable_joystick
   Keyboard                  $enable_keyboard
-  Linux Input               $enable_linux_input
+  Linux Input               $enable_linux_input           $LIBUDEV_CFLAGS $LIBUDEV_LIBS
   LiRC                      $enable_lirc
   MuTouch touchscreen       $enable_mutouch
   Zytronic touchscreen      $enable_zytronic

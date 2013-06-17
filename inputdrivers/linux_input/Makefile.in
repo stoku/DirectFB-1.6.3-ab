@@ -100,7 +100,8 @@ LTLIBRARIES = $(linux_input_LTLIBRARIES)
 libdirectfb_linux_input_la_DEPENDENCIES =  \
 	$(top_builddir)/lib/direct/libdirect.la \
 	$(top_builddir)/src/libdirectfb.la
-am_libdirectfb_linux_input_la_OBJECTS = linux_input.lo
+am_libdirectfb_linux_input_la_OBJECTS =  \
+	libdirectfb_linux_input_la-linux_input.lo
 libdirectfb_linux_input_la_OBJECTS =  \
 	$(am_libdirectfb_linux_input_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
@@ -108,8 +109,8 @@ am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
 am__v_lt_0 = --silent
 libdirectfb_linux_input_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
 	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
-	$(AM_CFLAGS) $(CFLAGS) $(libdirectfb_linux_input_la_LDFLAGS) \
-	$(LDFLAGS) -o $@
+	$(libdirectfb_linux_input_la_CFLAGS) $(CFLAGS) \
+	$(libdirectfb_linux_input_la_LDFLAGS) $(LDFLAGS) -o $@
 DEFAULT_INCLUDES = -I.@am__isrc@ -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__depfiles_maybe = depfiles
@@ -250,6 +251,8 @@ LIBPNG_CFLAGS = @LIBPNG_CFLAGS@
 LIBPNG_LIBS = @LIBPNG_LIBS@
 LIBS = @LIBS@
 LIBTOOL = @LIBTOOL@
+LIBUDEV_CFLAGS = @LIBUDEV_CFLAGS@
+LIBUDEV_LIBS = @LIBUDEV_LIBS@
 LINOTYPE_CFLAGS = @LINOTYPE_CFLAGS@
 LINOTYPE_LIBS = @LINOTYPE_LIBS@
 LIPO = @LIPO@
@@ -393,10 +396,14 @@ libdirectfb_linux_input_la_SOURCES = \
 	input_fake.h		\
 	linux_input.c
 
+libdirectfb_linux_input_la_CFLAGS = \
+	$(LIBUDEV_CFLAGS)
+
 libdirectfb_linux_input_la_LDFLAGS = \
 	-module			\
 	-avoid-version		\
-	$(DFB_LDFLAGS)
+	$(DFB_LDFLAGS)		\
+	$(LIBUDEV_LIBS)
 
 libdirectfb_linux_input_la_LIBADD = \
 	$(top_builddir)/lib/direct/libdirect.la \
@@ -478,7 +485,7 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/linux_input.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libdirectfb_linux_input_la-linux_input.Plo@am__quote@
 
 .c.o:
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
@@ -500,6 +507,13 @@ distclean-compile:
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$<' object='$@' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LTCOMPILE) -c -o $@ $<
+
+libdirectfb_linux_input_la-linux_input.lo: linux_input.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libdirectfb_linux_input_la_CFLAGS) $(CFLAGS) -MT libdirectfb_linux_input_la-linux_input.lo -MD -MP -MF $(DEPDIR)/libdirectfb_linux_input_la-linux_input.Tpo -c -o libdirectfb_linux_input_la-linux_input.lo `test -f 'linux_input.c' || echo '$(srcdir)/'`linux_input.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libdirectfb_linux_input_la-linux_input.Tpo $(DEPDIR)/libdirectfb_linux_input_la-linux_input.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='linux_input.c' object='libdirectfb_linux_input_la-linux_input.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libdirectfb_linux_input_la_CFLAGS) $(CFLAGS) -c -o libdirectfb_linux_input_la-linux_input.lo `test -f 'linux_input.c' || echo '$(srcdir)/'`linux_input.c
 
 mostlyclean-libtool:
 	-rm -f *.lo

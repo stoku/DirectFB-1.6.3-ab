@@ -20,10 +20,14 @@ libdirectfb_linux_input_la_SOURCES = \
 	input_fake.h		\
 	linux_input.c
 
+libdirectfb_linux_input_la_CFLAGS = \
+	$(LIBUDEV_CFLAGS)
+
 libdirectfb_linux_input_la_LDFLAGS = \
 	-module			\
 	-avoid-version		\
-	$(DFB_LDFLAGS)
+	$(DFB_LDFLAGS)		\
+	$(LIBUDEV_LIBS)
 
 libdirectfb_linux_input_la_LIBADD = \
 	$(top_builddir)/lib/direct/libdirect.la \

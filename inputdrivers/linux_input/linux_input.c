@@ -115,6 +115,9 @@ typedef unsigned long kernel_ulong_t;
 
 #include <core/input_driver.h>
 
+#ifdef HAVE_LIBUDEV
+#include <libudev.h>
+#endif
 
 DFB_INPUT_DRIVER( linux_input )
 
@@ -1051,7 +1054,7 @@ get_device_info( int              fd,
      /* get device name */
      ioctl( fd, EVIOCGNAME(DFB_INPUT_DEVICE_DESC_NAME_LENGTH - 1), info->desc.name );
 
-     D_DEBUG_AT( Debug_LinuxInput, "  -> name '%s'\n", __FUNCTION__, info->desc.name );
+     D_DEBUG_AT( Debug_LinuxInput, "  -> name '%s'\n", info->desc.name );
 
      /* set device vendor */
      snprintf( info->desc.vendor,
@@ -1188,7 +1191,7 @@ get_device_info( int              fd,
      info->desc.vendor_id  = devinfo.vendor;
      info->desc.product_id = devinfo.product;
 
-     D_DEBUG_AT( Debug_LinuxInput, "  -> ids %d/%d\n", __FUNCTION__, info->desc.vendor_id, info->desc.product_id );
+     D_DEBUG_AT( Debug_LinuxInput, "  -> ids %d/%d\n", info->desc.vendor_id, info->desc.product_id );
 }
 
 static bool
@@ -1493,6 +1496,198 @@ exit:
      return capabilities;
 }
 
+#ifdef HAVE_LIBUDEV
+/*
+ * Detect udev hotplug events from udev_monitor and act
+ * according to hotplug events received.
+ */
+static void *
+udev_hotplug_EventThread(DirectThread *thread, void * hotplug_data)
+{
+     D_DEBUG_AT( Debug_LinuxInput, "%s()\n", __FUNCTION__ );
+
+     CoreDFB             *core;
+     void                *driver;
+     HotplugThreadData   *data = (HotplugThreadData *)hotplug_data;
+     struct udev         *udev;
+     struct udev_monitor *mon;
+     int                  fdmax;
+     int                  rc;
+
+     D_ASSERT( data != NULL );
+     D_ASSERT( data->core != NULL );
+     D_ASSERT( data->driver != NULL );
+
+     core = data->core;
+     driver = data->driver;
+
+     /* Free no needed data packet */
+     D_FREE(data);
+
+     udev = udev_new();
+     if (!udev) {
+          D_PERROR( "DirectFB/linux_input: udev_new() failed: %s\n",
+                    strerror(errno) );
+          goto out;
+     }
+     mon = udev_monitor_new_from_netlink( udev, "udev" );
+     if (!mon) {
+          D_PERROR( "DirectFB/linux_input: "
+                    "udev_monitor_new_from_netlink() failed: %s\n",
+                    strerror(errno) );
+          goto out_udev;
+     }
+     rc = udev_monitor_filter_add_match_subsystem_devtype( mon, "input", NULL );
+     if (rc) {
+          D_PERROR( "DirectFB/linux_input: "
+                    "udev_monitor_filter_add_match_subsystem_devtype() "
+                    "failed: %s\n",
+                    strerror(rc) );
+          goto out_mon;
+     }
+     rc = udev_monitor_enable_receiving( mon );
+     if (rc) {
+          D_PERROR( "DirectFB/linux_input: "
+                    "udev_monitor_enable_receiving() failed: %s\n",
+                    strerror(rc) );
+          goto out_mon;
+     }
+     socket_fd = udev_monitor_get_fd( mon );
+     if (socket_fd <= 0) {
+          D_PERROR( "DirectFB/linux_input: "
+                    "udev_monitor_get_fd() failed: %s\n",
+                    strerror(errno) );
+          goto out_mon;
+     }
+
+     fdmax = MAX( socket_fd, hotplug_quitpipe[0] );
+
+     while(1) {
+          int                 device_num, number_file, index;
+          DFBResult           ret;
+          fd_set              rset;
+          struct udev_device *dev;
+          const char         *node, *action;
+
+          /* get udev event */
+          FD_ZERO(&rset);
+          FD_SET(socket_fd, &rset);
+          FD_SET(hotplug_quitpipe[0], &rset);
+
+          number_file = select(fdmax+1, &rset, NULL, NULL, NULL);
+
+          if (number_file < 0 && errno != EINTR)
+               break;
+
+          if (FD_ISSET( hotplug_quitpipe[0], &rset ))
+               break;
+
+          /* check cancel thread */
+          direct_thread_testcancel( thread );
+
+          if (!FD_ISSET(socket_fd, &rset))
+               continue;
+
+          dev = udev_monitor_receive_device( mon );
+          if (!dev) {
+               D_DEBUG_AT( Debug_LinuxInput,
+                           "error receiving udev device: %s\n",
+                           strerror(errno) );
+               continue;
+          }
+          /* check cancel thread */
+          direct_thread_testcancel( thread );
+
+          /* analysize udev event */
+          action = udev_device_get_action( dev );
+          node   = udev_device_get_devnode( dev );
+
+          if (!node || strncmp(node, "/dev/input/event", 16)) {
+               D_DEBUG_AT( Debug_LinuxInput, "Irrelevant node (%s)\n", node );
+               udev_device_unref( dev );
+               continue;
+          }
+
+          /* get event device number */
+          device_num = atoi(node + 16);
+
+          /* Attempt to lock the driver suspended mutex. */
+          pthread_mutex_lock(&driver_suspended_lock);
+          if (driver_suspended)
+          {
+               /* Release the lock and quit handling hotplug events. */
+               D_DEBUG_AT( Debug_LinuxInput, "Driver is suspended\n" );
+               pthread_mutex_unlock(&driver_suspended_lock);
+               udev_device_unref( dev );
+               continue;
+          }
+
+          /* Handle hotplug events since the driver is not suspended. */
+          if (!strcmp(action, "add")) {
+               D_DEBUG_AT( Debug_LinuxInput,
+                           "Device node /dev/input/event%d is created by udev\n",
+                           device_num);
+
+               ret = register_device_node( device_num, &index);
+               if ( DFB_OK == ret) {
+                    /* Handle the event that the input device node is created */
+                    ret = dfb_input_create_device(index, core, driver);
+
+                    /* If cannot create the device within Linux Input
+                     * provider, inform the user.
+                     */
+                    if ( DFB_OK != ret) {
+                         D_DEBUG_AT( Debug_LinuxInput,
+                                     "Linux/Input: Failed to create the "
+                                     "device for /dev/input/event%d\n",
+                                     device_num );
+                    }
+               }
+          }
+          else if (!strcmp(action, "remove")) {
+               D_DEBUG_AT( Debug_LinuxInput,
+                           "Device node /dev/input/event%d is removed by udev\n",
+                           device_num );
+               ret = unregister_device_node( device_num, &index );
+
+               if ( DFB_OK == ret) {
+                    /* Handle the event that the input device node is removed */
+                    ret = dfb_input_remove_device( index, driver );
+
+                    /* If unable to remove the device within the Linux Input
+                     * provider, just print the info.
+                     */
+                    if ( DFB_OK != ret) {
+                         D_DEBUG_AT( Debug_LinuxInput,
+                                     "Linux/Input: Failed to remove the "
+                                     "device for /dev/input/event%d\n",
+                                     device_num );
+                    }
+               }
+          }
+          else {
+               D_DEBUG_AT( Debug_LinuxInput, "Unknown action (%s)\n", action );
+          }
+
+          /* Hotplug event handling is complete so release the lock. */
+          pthread_mutex_unlock(&driver_suspended_lock);
+
+          udev_device_unref( dev );
+     }
+
+     D_DEBUG_AT( Debug_LinuxInput,
+                 "Finished hotplug detection thread within Linux Input "
+                 "provider.\n" );
+
+     socket_fd = 0;
+out_mon:
+     udev_monitor_unref( mon );
+out_udev:
+     udev_unref( udev );
+out:
+     return NULL;
+}
+#else /* HAVE_LIBUDEV */
 /*
  * Detect udev hotplug events from socket /org/kernel/udev/monitor and act
  * according to hotplug events received.
@@ -1670,6 +1865,7 @@ errorExit:
 
      return NULL;
 }
+#endif /* HAVE_LIBUDEV */
 
 /*
  * Stop hotplug detection thread.
