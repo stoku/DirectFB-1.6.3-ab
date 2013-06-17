@@ -522,10 +522,10 @@ sh_du_set_output_config( CoreScreen                  *screen,
           switch (config->resolution) {
           case DSOR_640_480:
                timings[HDS].value = 125;
-               timings[HDE].value = 925;
+               timings[HDE].value = 765;
                timings[VDS].value = 31;
                timings[VDE].value = 511;
-               timings[HC].value  = 959;
+               timings[HC].value  = 799;
                timings[HSW].value = 95;
                timings[VC].value  = 524;
                timings[VSP].value = 522;
