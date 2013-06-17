@@ -131,7 +131,7 @@ static int sh_2dg_exec(struct sh_2dg_miscdevice *dev)
 		dev_err( dev->dev, "CER detected at 0x%08x\n", cst );
 		while (i < dev->cb.size) {
 			pr_err( "\t%03x: 0x%08x%s\n",
-				dev->cb.va[j][i],
+				i, dev->cb.va[j][i],
 				(i == k) ? " <- here" : "");
 			if (dev->cb.va[j][i] == SH_2DG_CMD_TRAP)
 				break;
@@ -436,59 +436,11 @@ static struct platform_driver sh_2dg_driver = {
 	.remove	= sh_2dg_remove,
 	.driver	= {
 		.name	= "sh_2dg",
+		.owner	= THIS_MODULE,
 	},
 };
 
-static struct resource sh_2dg_resources[] = {
-	[0] = {
-		.start	= 0xFFE80000,
-		.end	= 0xFFE800FC - 1,
-		.flags	= IORESOURCE_MEM,
-	},
-	[1] = {
-		.start	= evt2irq(0x780),
-		.flags	= IORESOURCE_IRQ,
-	},
-};
-
-static void sh_2dg_device_release(struct device *dev)
-{
-}
-
-static struct platform_device sh_2dg_device = {
-	.name		= "sh_2dg",
-	.id		= -1,
-	.resource	= sh_2dg_resources,
-	.num_resources	= ARRAY_SIZE(sh_2dg_resources),
-	.dev = {
-		.release = sh_2dg_device_release,
-	},
-};
-
-static int __init sh_2dg_driver_init(void)
-{
-	int ret;
-
-	ret = platform_device_register(&sh_2dg_device);
-	if (ret)
-		return ret;
-
-	ret = platform_driver_register(&sh_2dg_driver);
-	if (ret)
-		platform_device_unregister(&sh_2dg_device);
-
-	return ret;
-}
-
-module_init(sh_2dg_driver_init);
-
-static void __exit sh_2dg_driver_exit(void)
-{
-	platform_driver_unregister(&sh_2dg_driver);
-	platform_device_unregister(&sh_2dg_device);
-}
-
-module_exit(sh_2dg_driver_exit);
+module_platform_driver( sh_2dg_driver );
 
 MODULE_DESCRIPTION("Renesas 2DG driver");
 MODULE_AUTHOR("Sosuke Tokunaga");

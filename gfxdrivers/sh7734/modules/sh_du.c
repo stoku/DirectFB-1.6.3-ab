@@ -326,59 +326,11 @@ static struct platform_driver sh_du_driver = {
 	.remove	= sh_du_remove,
 	.driver	= {
 		.name	= "sh_du",
+		.owner	= THIS_MODULE,
 	},
 };
 
-static struct resource sh_du_resources[] = {
-	[0] = {
-		.start	= 0xFFF80000,
-		.end	= 0xFFF9304C - 1,
-		.flags	= IORESOURCE_MEM,
-	},
-	[1] = {
-		.start	= evt2irq(0x3E0),
-		.flags	= IORESOURCE_IRQ,
-	},
-};
-
-static void sh_du_device_release(struct device *dev)
-{
-}
-
-static struct platform_device sh_du_device = {
-	.name		= "sh_du",
-	.id		= -1,
-	.resource	= sh_du_resources,
-	.num_resources	= ARRAY_SIZE(sh_du_resources),
-	.dev = {
-		.release = sh_du_device_release,
-	},
-};
-
-static int __init sh_du_driver_init(void)
-{
-	int ret;
-
-	ret = platform_device_register(&sh_du_device);
-	if (ret)
-		return ret;
-
-	ret = platform_driver_register(&sh_du_driver);
-	if (ret)
-		platform_device_unregister(&sh_du_device);
-
-	return ret;
-}
-
-module_init(sh_du_driver_init);
-
-static void __exit sh_du_driver_exit(void)
-{
-	platform_driver_unregister(&sh_du_driver);
-	platform_device_unregister(&sh_du_device);
-}
-
-module_exit(sh_du_driver_exit);
+module_platform_driver( sh_du_driver );
 
 MODULE_DESCRIPTION("Renesas DU driver");
 MODULE_AUTHOR("Sosuke Tokunaga");
