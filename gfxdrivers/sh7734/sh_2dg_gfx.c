@@ -31,13 +31,18 @@
 						 DSDRAW_XOR )
 
 #define SH_2DG_SUPPORTED_DRAWINGFUNCTIONS	(DFXL_FILLRECTANGLE | \
-						 DFXL_FILLTRIANGLE )
+                                                 DFXL_DRAWRECTANGLE | \
+                                                 DFXL_DRAWLINE | \
+						 DFXL_FILLTRIANGLE | \
+                                                 DFXL_FILLTRAPEZOID | \
+                                                 DFXL_FILLQUADRANGLE)
 
 #define SH_2DG_SUPPORTED_BLITTINGFLAGS		(DSBLIT_BLEND_ALPHACHANNEL | \
 						 DSBLIT_BLEND_COLORALPHA | \
 						 DSBLIT_SRC_COLORKEY | \
 						 DSBLIT_DST_COLORKEY | \
 						 DSBLIT_XOR | \
+                                                 DSBLIT_ROTATE180 | \
 						 DSBLIT_FLIP_HORIZONTAL | \
 						 DSBLIT_FLIP_VERTICAL )
 
@@ -71,6 +76,7 @@ typedef struct {
      } reg;
      u32                    rctl;
      DFBColor               color;
+     u32                    pixel;
      u32                    dst_key;
      u32                    src_key;
      u32                    rop;
@@ -79,6 +85,13 @@ typedef struct {
      CoreSurfaceBufferLock  work_lock;
      DFBDimension           work_size;
 } SH2dgDeviceData;
+
+typedef struct {
+     u32  addr;
+     u32  stride;
+     u32  size;
+     bool argb1555;
+} SH2dgBuffer;
 
 static int
 write_cmds( int fd, const u32 *cmds, size_t count)
@@ -273,8 +286,10 @@ check_blend_functions( CardState *state )
      //case SH_2DG_BLEND_FUNC_PAIR(DSBF_ONE,      DSBF_ZERO):
      case SH_2DG_BLEND_FUNC_PAIR(DSBF_SRCALPHA, DSBF_INVSRCALPHA):
           ret = true;
+          break;
      default:
           ret = false;
+          break;
      }
      return ret;
 }
@@ -288,48 +303,53 @@ color_to_pixel( const DFBColor *color, bool argb1555 )
             PIXEL_RGB16( (u32)color->r, (u32)color->g, (u32)color->b );
 }
 
+static void
+surface_to_buffer( SH2dgBuffer *buffer, const CoreSurfaceBufferLock *surface )
+{
+     D_ASSERT( surface->buffer != NULL );
+     D_ASSERT( (surface->buffer->format == DSPF_RGB16) ||
+               (surface->buffer->format == DSPF_ARGB1555) );
+
+     buffer->argb1555 = (surface->buffer->format == DSPF_ARGB1555);
+     buffer->addr     = surface->phys;
+     buffer->stride   = surface->pitch / 2; /* 16bpp only */
+     buffer->size     = SH_2DG_XY( surface->buffer->config.size.w,
+                                   surface->buffer->config.size.h );
+}
+
 static int
 set_destination( SHGfxDriverData *drv,
                  SH2dgDeviceData *dev,
-                 CardState *state )
+                 const SH2dgBuffer *buffer )
 {
-     u32 cmds[9], i, dstr, sclma;
-     DFBSurfacePixelFormat format;
-
-     D_ASSERT( state->dst.buffer != NULL );
-     D_ASSERT( (state->dst.buffer->format == DSPF_RGB16) ||
-               (state->dst.buffer->format == DSPF_ARGB1555) );
-
-     format = state->dst.buffer->format;
-     if (format == DSPF_RGB16)
-          D_FLAGS_CLEAR(dev->rctl, SH_2DG_RCLR_DPF);
-     else
-          D_FLAGS_SET(dev->rctl, SH_2DG_RCLR_DPF);
+     u32 cmds[9], i;
 
      i = 0;
-     if (dev->reg.rsa != state->dst.phys) {
+     if (dev->reg.rsa != buffer->addr) {
           cmds[i++]    = SH_2DG_WPR;
           cmds[i++]    = SH_2DG_REG(1, SH_2DG_RSAR);
-          cmds[i++]    = state->dst.phys;
-          dev->reg.rsa = state->dst.phys;
+          cmds[i++]    = buffer->addr;
+          dev->reg.rsa = buffer->addr;
      }
 
-     dstr = (state->dst.pitch * 8) / DFB_BITS_PER_PIXEL( format );
-     if (dev->reg.dstr != dstr) {
+     if (dev->reg.dstr != buffer->stride) {
           cmds[i++]     = SH_2DG_WPR;
           cmds[i++]     = SH_2DG_REG(1, SH_2DG_DSTRR);
-          cmds[i++]     = dstr;
-          dev->reg.dstr = dstr;
+          cmds[i++]     = buffer->stride;
+          dev->reg.dstr = buffer->stride;
      }
 
-     sclma = SH_2DG_XY( state->destination->config.size.w - 1,
-                        state->destination->config.size.h - 1 );
-     if (dev->reg.sclma != sclma) {
+     if (dev->reg.sclma != buffer->size) {
 	     cmds[i++]      = SH_2DG_WPR;
 	     cmds[i++]      = SH_2DG_REG(1, SH_2DG_SCLMAR);
-	     cmds[i++]      = sclma;
-             dev->reg.sclma = sclma;
+	     cmds[i++]      = buffer->size;
+             dev->reg.sclma = buffer->size;
      }
+
+     if (buffer->argb1555)
+          D_FLAGS_SET(dev->rctl, SH_2DG_RCLR_DPF);
+     else
+          D_FLAGS_CLEAR(dev->rctl, SH_2DG_RCLR_DPF);
 
      return (i > 0) ? write_cmds( drv->gfx_fd, cmds, i ) : 0;
 }
@@ -337,36 +357,29 @@ set_destination( SHGfxDriverData *drv,
 static int
 set_source( SHGfxDriverData *drv,
             SH2dgDeviceData *dev,
-            CardState *state )
+            const SH2dgBuffer *buffer )
 {
-     u32 cmds[6], i, sstr;
-     DFBSurfacePixelFormat format;
-
-     D_ASSERT( state->src.buffer != NULL );
-     D_ASSERT( (state->src.buffer->format == DSPF_RGB16) ||
-               (state->src.buffer->format == DSPF_ARGB1555) );
-
-     format = state->src.buffer->format;
-     if (format == DSPF_RGB16)
-          D_FLAGS_CLEAR(dev->rctl, SH_2DG_RCLR_SPF);
-     else
-          D_FLAGS_SET(dev->rctl, SH_2DG_RCLR_SPF);
+     u32 cmds[6], i;
 
      i = 0;
-     if (dev->reg.ssa != state->src.phys) {
-	     cmds[i++] = SH_2DG_WPR;
-	     cmds[i++] = SH_2DG_REG(1, SH_2DG_SSAR);
-	     cmds[i++] = state->src.phys;
-             dev->reg.ssa = state->src.phys;
+     if (dev->reg.ssa != buffer->addr) {
+	     cmds[i++]    = SH_2DG_WPR;
+	     cmds[i++]    = SH_2DG_REG(1, SH_2DG_SSAR);
+	     cmds[i++]    = buffer->addr;
+             dev->reg.ssa = buffer->addr;
      }
 
-     sstr = (state->src.pitch * 8) / DFB_BITS_PER_PIXEL( format );
-     if (dev->reg.sstr != sstr) {
+     if (dev->reg.sstr != buffer->stride) {
           cmds[i++]     = SH_2DG_WPR;
           cmds[i++]     = SH_2DG_REG(1, SH_2DG_SSTRR);
-          cmds[i++]     = sstr;
-          dev->reg.sstr = sstr;
+          cmds[i++]     = buffer->stride;
+          dev->reg.sstr = buffer->stride;
      }
+
+     if (buffer->argb1555)
+          D_FLAGS_SET(dev->rctl, SH_2DG_RCLR_SPF);
+     else
+          D_FLAGS_CLEAR(dev->rctl, SH_2DG_RCLR_SPF);
 
      return (i > 0) ? write_cmds( drv->gfx_fd, cmds, i ) : 0;
 }
@@ -374,12 +387,12 @@ set_source( SHGfxDriverData *drv,
 static int
 set_clip( SHGfxDriverData *drv,
           SH2dgDeviceData *dev,
-          CardState *state )
+          const DFBRegion *region )
 {
      u32 uclmi, uclma;
 
-     uclmi = SH_2DG_XY( state->clip.x1, state->clip.y1 );
-     uclma = SH_2DG_XY( state->clip.x2, state->clip.y2 );
+     uclmi = SH_2DG_XY( region->x1, region->y1 );
+     uclma = SH_2DG_XY( region->x2, region->y2 );
      if ((dev->reg.uclmi != uclmi) || (dev->reg.uclma != uclma)) {
           u32 cmds[4];
 
@@ -463,14 +476,14 @@ set_rctl( SHGfxDriverData *drv, SH2dgDeviceData *dev )
 static int
 set_drawing( SHGfxDriverData *drv,
              SH2dgDeviceData *dev,
-             CardState *state )
+             DFBSurfaceDrawingFlags flags )
 {
      int ret = 0;
 
-     dev->rop = D_FLAGS_IS_SET( state->drawingflags, DSDRAW_XOR ) ?
+     dev->rop = D_FLAGS_IS_SET( flags, DSDRAW_XOR ) ?
                 SH_2DG_ROP_XOR : SH_2DG_ROP_COPY;
 
-     if (D_FLAGS_IS_SET( state->drawingflags, DSDRAW_BLEND )) {
+     if (D_FLAGS_IS_SET( flags, DSDRAW_BLEND )) {
           dev->mode |= SH_2DG_DRAWMODE_AE | SH_2DG_DRAWMODE_BLKE;
           dev->rop   = SH_2DG_ROP_COPY;
           ret = set_alpha( drv, dev );
@@ -478,7 +491,7 @@ set_drawing( SHGfxDriverData *drv,
                goto out;
      }
 
-     if (D_FLAGS_IS_SET( state->drawingflags, DSDRAW_DST_COLORKEY )) {
+     if (D_FLAGS_IS_SET( flags, DSDRAW_DST_COLORKEY )) {
           dev->mode |= SH_2DG_DRAWMODE_DTRANS;
           ret = set_dst_key( drv, dev );
      }
@@ -490,16 +503,16 @@ out:
 static int
 set_blitting( SHGfxDriverData *drv,
               SH2dgDeviceData *dev,
-              CardState *state )
+              DFBSurfaceBlittingFlags flags )
 {
      int ret = 0;
 
-     if (D_FLAGS_IS_SET( state->blittingflags, DSBLIT_BLEND_ALPHACHANNEL )) {
+     if (D_FLAGS_IS_SET( flags, DSBLIT_BLEND_ALPHACHANNEL )) {
           if (D_FLAGS_IS_SET( dev->rctl, SH_2DG_RCLR_SPF ))
                dev->mode |= SH_2DG_DRAWMODE_AE | SH_2DG_DRAWMODE_SAE;
           dev->rop = SH_2DG_ROP_COPY;
      }
-     else if (D_FLAGS_IS_SET( state->blittingflags, DSBLIT_BLEND_COLORALPHA )) {
+     else if (D_FLAGS_IS_SET( flags, DSBLIT_BLEND_COLORALPHA )) {
           dev->mode |= SH_2DG_DRAWMODE_AE;
           dev->rop   = SH_2DG_ROP_COPY;
           ret = set_alpha( drv, dev );
@@ -507,28 +520,31 @@ set_blitting( SHGfxDriverData *drv,
                goto out;
      }
      else {
-          dev->rop = D_FLAGS_IS_SET( state->blittingflags, DSBLIT_XOR ) ?
+          dev->rop = D_FLAGS_IS_SET( flags, DSBLIT_XOR ) ?
                      SH_2DG_ROP_XOR : SH_2DG_ROP_COPY;
      }
 
-     if (D_FLAGS_IS_SET( state->blittingflags, DSBLIT_SRC_COLORKEY )) {
+     if (D_FLAGS_IS_SET( flags, DSBLIT_SRC_COLORKEY )) {
           dev->mode |= SH_2DG_DRAWMODE_STRANS;
           ret = set_src_key( drv, dev );
           if (ret < 0)
                goto out;
      }
 
-     if (D_FLAGS_IS_SET( state->blittingflags, DSBLIT_DST_COLORKEY )) {
+     if (D_FLAGS_IS_SET( flags, DSBLIT_DST_COLORKEY )) {
           dev->mode |= SH_2DG_DRAWMODE_DTRANS;
           ret = set_dst_key( drv, dev );
           if (ret < 0)
                goto out;
      }
 
-     if (D_FLAGS_IS_SET( state->blittingflags, DSBLIT_FLIP_HORIZONTAL ))
+     if (D_FLAGS_IS_SET( flags, DSBLIT_FLIP_HORIZONTAL ))
           dev->mode |= SH_2DG_DRAWMODE_SRCDIRX;
-     if (D_FLAGS_IS_SET( state->blittingflags, DSBLIT_FLIP_VERTICAL ))
+     if (D_FLAGS_IS_SET( flags, DSBLIT_FLIP_VERTICAL ))
           dev->mode |= SH_2DG_DRAWMODE_SRCDIRY;
+     if (D_FLAGS_IS_SET( flags, DSBLIT_ROTATE180 ))
+          dev->mode ^= SH_2DG_DRAWMODE_SRCDIRX | SH_2DG_DRAWMODE_SRCDIRY;
+
 out:
      return ret;
 }
@@ -554,50 +570,80 @@ clear_stencil( SHGfxDriverData *drv,
 static int
 fill_stencil( const SHGfxDriverData *drv,
               const SH2dgDeviceData *dev,
+              u32 mode,
               const DFBRectangle *bounds,
-              const DFBPoint *points,
-              int num_points)
+              const DFBPoint points[4])
 {
-     int ret, i;
-     u32 *cmds, size;
+     int n, i;
+     u32 cmds[9];
 
      D_ASSERT( dev->work_surface );
 
-     size = num_points + 5;
-     cmds = (__u32 *)D_MALLOC( size * sizeof(u32) );
-     if (!cmds)
-          return -ENOMEM;
+     n    = ((points[0].x == points[3].x) && (points[0].y == points[3].y)) ?
+            3 : 4;
 
-     cmds[0] = SH_2DG_FTRAPC( dev->mode );
-     cmds[1] = num_points + 1;
+     cmds[0] = SH_2DG_FTRAPC( mode );
+     cmds[1] = n + 1;
      cmds[2] = SH_2DG_XY( bounds->x, bounds->y );
      cmds[3] = SH_2DG_XY( bounds->x + bounds->w - 1,
                           bounds->y + bounds->h - 1 );
-     for (i = 0; i < num_points; i++)
+     for (i = 0; i < n; i++)
           cmds[4 + i] = SH_2DG_XY( points[i].x, points[i].y );
      cmds[4 + i] = SH_2DG_XY( points[0].x, points[0].y );
 
-     ret = write_cmds( drv->gfx_fd, cmds, size );
-     free( cmds );
+     return write_cmds( drv->gfx_fd, cmds, n + 5 );
+}
 
-     return ret;
+static int
+stroke_line( const SHGfxDriverData *drv,
+             const SH2dgDeviceData *dev,
+             u32 mode,
+             const DFBPoint points[2] )
+{
+     u32 cmds[5];
+
+     cmds[0] = SH_2DG_LINEC( mode );
+     cmds[1] = (dev->pixel << 16) | 2;
+     cmds[2] = 0; /* width is always 1 */
+     cmds[3] = SH_2DG_XY( points[0].x, points[0].y );
+     cmds[4] = SH_2DG_XY( points[1].x, points[1].y );
+
+     return write_cmds( drv->gfx_fd, cmds, D_ARRAY_SIZE( cmds ) );
+}
+
+static int
+stroke_quad( const SHGfxDriverData *drv,
+             const SH2dgDeviceData *dev,
+             u32 mode,
+             const DFBPoint points[4] )
+{
+     u32 cmds[8];
+     int i;
+
+     cmds[0] = SH_2DG_LINEC( mode );
+     cmds[1] = (dev->pixel << 16) | 5;
+     cmds[2] = 0; /* width is always 1 */
+     for (i = 0; i < 4; i++)
+         cmds[3 + i] = SH_2DG_XY( points[i].x, points[i].y );
+     cmds[3 + i] = SH_2DG_XY( points[0].x, points[0].y );
+
+     return write_cmds( drv->gfx_fd, cmds, D_ARRAY_SIZE( cmds ) );
 }
 
 static int
 fill_rect( const SHGfxDriverData *drv,
            const SH2dgDeviceData *dev,
+           u32 mode,
            const DFBRectangle *rect )
 {
      u32  cmds[6];
-     bool argb1555;
 
      D_ASSERT( rect->w > 0 );
      D_ASSERT( rect->h > 0 );
 
-     argb1555 = D_FLAGS_IS_SET( dev->rctl, SH_2DG_RCLR_DPF );
-     cmds[0]  = SH_2DG_BITBLTC( dev->mode );
+     cmds[0]  = SH_2DG_BITBLTC( mode );
      cmds[1]  = dev->rop;
-     cmds[2]  = color_to_pixel( &dev->color, argb1555 );
+     cmds[2]  = dev->pixel;
      cmds[3]  = rect->w - 1;
      cmds[4]  = rect->h - 1;
      cmds[5]  = SH_2DG_XY( rect->x, rect->y );
@@ -608,15 +654,14 @@ fill_rect( const SHGfxDriverData *drv,
 static int
 fill_quad( const SHGfxDriverData *drv,
            const SH2dgDeviceData *dev,
+           u32 mode,
            const DFBPoint points[4])
 {
      u32  cmds[6];
-     bool argb1555;
      int  i;
 
-     argb1555 = D_FLAGS_IS_SET( dev->rctl, SH_2DG_RCLR_DPF );
-     cmds[0] = SH_2DG_POLYGON4C( dev->mode );
-     cmds[1] = color_to_pixel( &dev->color, argb1555 );
+     cmds[0] = SH_2DG_POLYGON4C( mode );
+     cmds[1] = dev->pixel;
      for (i = 0; i < 4; i++)
           cmds[2 + i] = SH_2DG_XY( points[i].x, points[i].y );
 
@@ -626,13 +671,14 @@ fill_quad( const SHGfxDriverData *drv,
 static int
 copy_rect( const SHGfxDriverData *drv,
            const SH2dgDeviceData *dev,
+           u32 mode,
            const DFBRectangle *rect,
            int dx,
            int dy )
 {
      u32 cmds[6];
 
-     cmds[0] = SH_2DG_BITBLTA( dev->mode | SH_2DG_DRAWMODE_SS );
+     cmds[0] = SH_2DG_BITBLTA( mode | SH_2DG_DRAWMODE_SS );
      cmds[1] = dev->rop;
      cmds[2] = SH_2DG_XY( rect->x, rect->y );
      cmds[3] = rect->w - 1;
@@ -645,13 +691,14 @@ copy_rect( const SHGfxDriverData *drv,
 static int
 copy_quad( const SHGfxDriverData *drv,
            const SH2dgDeviceData *dev,
+           u32 mode,
            const DFBRectangle *rect,
            const DFBPoint points[4] )
 {
      u32 cmds[8];
      int i;
 
-     cmds[0] = SH_2DG_POLYGON4A(dev->mode | SH_2DG_DRAWMODE_SS);
+     cmds[0] = SH_2DG_POLYGON4A( mode | SH_2DG_DRAWMODE_SS );
      cmds[1] = SH_2DG_XY(rect->x, rect->y);
      cmds[2] = SH_2DG_XY(rect->w, rect->h);
      cmds[3] = 0;
@@ -729,12 +776,11 @@ sh_2dg_engine_reset( void *driver_data, void *device_data )
      SHGfxDriverData  *drv;
      SH2dgDeviceData  *dev;
 
-     D_DEBUG_AT( SH_2DG_GFX, "%s()\n", __FUNCTION__ );
-     D_INFO( "SH-2DG/Graphics: Engine Reset\n");
-
      drv = (SHGfxDriverData *)driver_data;
      dev = (SH2dgDeviceData *)device_data;
 
+     D_DEBUG_AT( SH_2DG_GFX, "%s()\n", __FUNCTION__ );
+     D_INFO( "SH-2DG/Graphics: Engine Reset\n");
      if (ioctl( drv->gfx_fd, SH_2DG_IOC_RESET ))
           goto err_io;
 
@@ -759,22 +805,6 @@ sh_2dg_engine_sync( void *driver_data, void *device_data )
      drv = (SHGfxDriverData *)driver_data;
 
      return rc_to_result(fsync( drv->gfx_fd ));
-}
-
-static void
-sh_2dg_flush_texture_cache( void *driver_data, void *device_data )
-{
-     SHGfxDriverData *drv;
-     u32 cmds[1];
-
-     D_DEBUG_AT( SH_2DG_GFX, "%s()\n", __FUNCTION__ );
-     D_UNUSED_P( device_data );
-
-     drv = (SHGfxDriverData *)driver_data;
-
-     cmds[0] = SH_2DG_SYNC( SH_2DG_SYNC_TCLR );
-
-     (void)write_cmds( drv->gfx_fd, cmds, D_ARRAY_SIZE( cmds ) );
 }
 
 static void
@@ -831,6 +861,9 @@ sh_2dg_check_state( void *driver_data,
           }
 
           accel = SH_2DG_SUPPORTED_DRAWINGFUNCTIONS;
+          if (state->drawingflags != DSDRAW_NOFX)
+               /* unsupported by LINEC */
+               accel &= ~(DFXL_DRAWRECTANGLE | DFXL_DRAWLINE);
      }
      else { /* blitting */
           if (D_FLAGS_INVALID( state->blittingflags,
@@ -861,7 +894,8 @@ sh_2dg_check_state( void *driver_data,
                                                    DSBLIT_DST_COLORKEY |
                                                    DSBLIT_FLIP_HORIZONTAL |
                                                    DSBLIT_FLIP_VERTICAL ))
-               accel &= ~DFXL_STRETCHBLIT; /* unsupported by POLYGON4A */
+               /* unsupported by POLYGON4A */
+               accel &= ~DFXL_STRETCHBLIT;
      }
      state->accel |= accel;
 
@@ -879,8 +913,10 @@ sh_2dg_set_state( void *driver_data,
      SH2dgDeviceData *dev;
      StateModificationFlags modified;
 
-     D_DEBUG_AT( SH_2DG_GFX, "%s( 0x%x, 0x%x )\n",
-                 __FUNCTION__, state->mod_hw, accel );
+     D_DEBUG_AT( SH_2DG_GFX, "%s( 0x%x, 0x%x, 0x%lx )\n",
+                 __FUNCTION__, state->mod_hw, accel,
+                 D_FLAGS_IS_SET( state->mod_hw, SMF_DESTINATION ) ?
+                 state->dst.phys : 0 );
      D_UNUSED_P( funcs );
 
      drv      = (SHGfxDriverData *)driver_data;
@@ -890,12 +926,15 @@ sh_2dg_set_state( void *driver_data,
      dev->mode = SH_2DG_DRAWMODE_CLIP;
 
      if (D_FLAGS_IS_SET( modified, SMF_DESTINATION )) {
-          if (set_destination( drv, dev, state ) < 0)
+          SH2dgBuffer buffer;
+
+          surface_to_buffer( &buffer, &state->dst );
+          if (set_destination( drv, dev, &buffer ) < 0)
                goto out;
           D_FLAGS_CLEAR( modified, SMF_DESTINATION );
      }
      if (D_FLAGS_IS_SET( modified, SMF_CLIP )) {
-          if (set_clip( drv, dev, state ) < 0)
+          if (set_clip( drv, dev, &state->clip ) < 0)
                goto out;
           D_FLAGS_CLEAR( modified, SMF_CLIP );
      }
@@ -911,20 +950,27 @@ sh_2dg_set_state( void *driver_data,
           dev->dst_key = state->dst_colorkey;
           D_FLAGS_CLEAR( modified, SMF_DST_COLORKEY );
      }
-
+     if (D_FLAGS_IS_SET( state->mod_hw, SMF_DESTINATION | SMF_COLOR )) {
+          bool argb1555;
+          argb1555 = D_FLAGS_IS_SET( dev->rctl, SH_2DG_RCLR_DPF );
+          dev->pixel = color_to_pixel( &dev->color, argb1555 );
+     }
      if (DFB_DRAWING_FUNCTION( accel )) {
-          if (set_drawing( drv, dev, state ) < 0)
+          if (set_drawing( drv, dev, state->drawingflags ) < 0)
                goto out;
           D_FLAGS_CLEAR( modified, SMF_DRAWING_FLAGS );
           state->set = SH_2DG_SUPPORTED_DRAWINGFUNCTIONS;
      }
      else { /* blitting */
           if (D_FLAGS_IS_SET( modified, SMF_SOURCE )) {
-               if (set_source( drv, dev, state ) < 0)
+               SH2dgBuffer buffer;
+
+               surface_to_buffer( &buffer, &state->src );
+               if (set_source( drv, dev, &buffer ) < 0)
                     goto out;
                D_FLAGS_CLEAR( modified, SMF_SOURCE );
           }
-          if (set_blitting( drv, dev, state ) < 0)
+          if (set_blitting( drv, dev, state->blittingflags ) < 0)
                goto out;
           D_FLAGS_CLEAR( modified, SMF_BLITTING_FLAGS );
           state->set = SH_2DG_SUPPORTED_BLITTINGFUNCTIONS;
@@ -951,8 +997,72 @@ sh_2dg_fill_rectangle( void *driver_data,
 
      rc = set_rctl( drv, dev );
      if (rc >= 0)
-          rc = fill_rect( drv, dev, rect );
+          rc = fill_rect( drv, dev, dev->mode, rect );
 
+     return (rc >= 0);
+}
+
+static bool
+sh_2dg_draw_rectangle( void *driver_data,
+                       void *device_data,
+                       DFBRectangle *rect )
+{
+     SHGfxDriverData *drv;
+     SH2dgDeviceData *dev;
+     int rc;
+
+     D_DEBUG_AT( SH_2DG_GFX, "%s()\n", __FUNCTION__ );
+
+     drv = (SHGfxDriverData *)driver_data;
+     dev = (SH2dgDeviceData *)device_data;
+
+     rc = set_rctl( drv, dev );
+     if (rc >= 0) {
+          u32 mode;
+          DFBPoint points[4];
+
+          points[0].x = rect->x;
+          points[0].y = rect->y;
+          points[1].x = rect->x + rect->w - 1;
+          points[1].y = rect->y;
+          points[2].x = rect->x + rect->w - 1;
+          points[2].y = rect->y + rect->h - 1;
+          points[3].x = rect->x;
+          points[3].y = rect->y + rect->h - 1;
+          mode = dev->mode & (SH_2DG_DRAWMODE_CLIP | SH_2DG_DRAWMODE_RCLIP);
+          rc   = stroke_quad( drv, dev, mode, points );
+     }
+     return (rc >= 0);
+}
+
+static bool
+sh_2dg_draw_line( void *driver_data,
+                  void *device_data,
+                  DFBRegion *line )
+{
+     SHGfxDriverData *drv;
+     SH2dgDeviceData *dev;
+     int rc;
+
+     D_DEBUG_AT( SH_2DG_GFX, "%s()\n", __FUNCTION__ );
+
+     drv = (SHGfxDriverData *)driver_data;
+     dev = (SH2dgDeviceData *)device_data;
+
+     rc = set_rctl( drv, dev );
+     if (rc >= 0) {
+          u32 mode;
+          DFBPoint points[2];
+
+          points[0].x = line->x1;
+          points[0].y = line->y1;
+          points[1].x = line->x2;
+          points[1].y = line->y2;
+          mode = dev->mode & (SH_2DG_DRAWMODE_CLIP | SH_2DG_DRAWMODE_RCLIP);
+          if ((points[0].x != points[1].x) && (points[0].y != points[1].y))
+               mode |= SH_2DG_DRAWMODE_AA;
+          rc = stroke_line( drv, dev, mode, points );
+     }
      return (rc >= 0);
 }
 
@@ -984,31 +1094,138 @@ sh_2dg_fill_triangle( void *driver_data,
      points[3].x = tri->x1;
      points[3].y = tri->y1;
 
+#if 0 /* this is slower than the else case */
      if ((dev->rop == SH_2DG_ROP_COPY) &&
-          !D_FLAGS_IS_SET(dev->mode, SH_2DG_DRAWMODE_DTRANS)) {
+          !D_FLAGS_IS_SET( dev->mode, SH_2DG_DRAWMODE_DTRANS |
+                                      SH_2DG_DRAWMODE_BLKE )) {
 
-          rc = fill_quad( drv, dev, points );
+          rc = fill_quad( drv, dev, dev->mode, points );
      }
-     else {
-          __u32 mode;
+     else
+#endif
+     {
+          u32 mode;
           DFBRectangle rect;
 
-          get_bounds( &rect, points, 3 );
-
-          mode = dev->mode;
-          dev->mode &= SH_2DG_DRAWMODE_CLIP | SH_2DG_DRAWMODE_RCLIP;
           rc = clear_stencil( drv, dev );
           if (rc < 0)
                goto out;
 
-          rc = fill_stencil( drv, dev, &rect, points, 3 );
+          get_bounds( &rect, points, 3 );
+          mode = dev->mode & (SH_2DG_DRAWMODE_CLIP | SH_2DG_DRAWMODE_RCLIP);
+          rc = fill_stencil( drv, dev, mode, &rect, points );
           if (rc < 0)
                goto out;
 
-          dev->mode = mode | SH_2DG_DRAWMODE_WORK;
-          rc = fill_rect( drv, dev, &rect );
+          rc = fill_rect( drv, dev, dev->mode | SH_2DG_DRAWMODE_WORK, &rect );
+     }
 
-          dev->mode = mode;
+out:
+     return (rc >= 0);
+}
+
+static bool
+sh_2dg_fill_trapezoid( void *driver_data,
+                       void *device_data,
+                       DFBTrapezoid *trap )
+{
+     SHGfxDriverData *drv;
+     SH2dgDeviceData *dev;
+     DFBPoint points[4];
+     int rc;
+
+     D_DEBUG_AT( SH_2DG_GFX, "%s()\n", __FUNCTION__ );
+
+     drv = (SHGfxDriverData *)driver_data;
+     dev = (SH2dgDeviceData *)device_data;
+
+     rc = set_rctl( drv, dev );
+     if (rc < 0)
+          goto out;
+
+     points[0].x = trap->x1;
+     points[0].y = trap->y1;
+     points[1].x = trap->x1 + trap->w1;
+     points[1].y = trap->y1;
+     points[2].x = trap->x2 + trap->w2;
+     points[2].y = trap->y2;
+     points[3].x = trap->x2;
+     points[3].y = trap->y2;
+
+     if ((dev->rop == SH_2DG_ROP_COPY) &&
+          !D_FLAGS_IS_SET(dev->mode, SH_2DG_DRAWMODE_DTRANS |
+                                     SH_2DG_DRAWMODE_BLKE )) {
+
+          rc = fill_quad( drv, dev, dev->mode, points );
+     }
+     else {
+          u32 mode;
+          DFBRectangle rect;
+
+          rc = clear_stencil( drv, dev );
+          if (rc < 0)
+               goto out;
+
+          get_bounds( &rect, points, 4 );
+          mode = dev->mode & (SH_2DG_DRAWMODE_CLIP | SH_2DG_DRAWMODE_RCLIP);
+          rc   = fill_stencil( drv, dev, mode, &rect, points );
+          if (rc < 0)
+               goto out;
+
+          rc = fill_rect( drv, dev, dev->mode | SH_2DG_DRAWMODE_WORK, &rect );
+     }
+
+out:
+     return (rc >= 0);
+}
+
+static bool
+sh_2dg_fill_quadrangles( void *driver_data,
+                         void *device_data,
+                         DFBPoint *points,
+                         int num)
+{
+     SHGfxDriverData *drv;
+     SH2dgDeviceData *dev;
+     int rc, i;
+
+     D_DEBUG_AT( SH_2DG_GFX, "%s()\n", __FUNCTION__ );
+
+     drv = (SHGfxDriverData *)driver_data;
+     dev = (SH2dgDeviceData *)device_data;
+
+     rc = set_rctl( drv, dev );
+     if (rc < 0)
+          goto out;
+
+     if ((num <= 1) && (dev->rop == SH_2DG_ROP_COPY) &&
+          !D_FLAGS_IS_SET(dev->mode, SH_2DG_DRAWMODE_DTRANS |
+                                     SH_2DG_DRAWMODE_BLKE )) {
+          rc = fill_quad( drv, dev, dev->mode, points );
+     }
+     else {
+          u32 mode;
+          DFBRectangle rect, grect;
+
+          rc = clear_stencil( drv, dev );
+          if (rc < 0)
+               goto out;
+
+          mode    = dev->mode & (SH_2DG_DRAWMODE_CLIP | SH_2DG_DRAWMODE_RCLIP);
+          grect.x = points[0].x;
+          grect.y = points[0].y;
+          grect.w = 0;
+          grect.h = 0;
+          for (i = 0; (i < num); i++) {
+               get_bounds( &rect, points, 4 );
+               rc = fill_stencil( drv, dev, mode, &rect, points );
+               if (rc < 0)
+                    goto out;
+               dfb_rectangle_union( &grect, &rect );
+               points += 4;
+          }
+
+          rc = fill_rect( drv, dev, dev->mode | SH_2DG_DRAWMODE_WORK, &grect );
      }
 
 out:
@@ -1036,7 +1253,7 @@ sh_2dg_blit( void *driver_data,
           goto out;
 
      if (rect->w >= 8) {
-          rc = copy_rect( drv, dev, rect, dx, dy );
+          rc = copy_rect( drv, dev, dev->mode, rect, dx, dy );
      }
      else {
           DFBPoint points[4];
@@ -1052,22 +1269,22 @@ sh_2dg_blit( void *driver_data,
           points[3].x = dx;
           points[3].y = dy + rect->h - 1;
 
-          mode = dev->mode;
+          w     = rect->w;
 
-          dev->mode &= SH_2DG_DRAWMODE_CLIP | SH_2DG_DRAWMODE_RCLIP;
           rc = clear_stencil( drv, dev );
           if (rc < 0)
                goto out;
-          rc = fill_stencil( drv, dev, rect, points, 4 );
+
+          mode = dev->mode & (SH_2DG_DRAWMODE_CLIP | SH_2DG_DRAWMODE_RCLIP);
+          rc = fill_stencil( drv, dev, mode, rect, points );
           if (rc < 0)
                goto out;
 
-          dev->mode = mode | SH_2DG_DRAWMODE_WORK;
-          w         = rect->w;
-          rect->w   = 8;
-          rc = copy_rect( drv, dev, rect, dx, dy );
-          dev->mode = mode;
-          rect->w   = w;
+          w       = rect->w;
+          rect->w = 8;
+          rc = copy_rect( drv, dev, dev->mode | SH_2DG_DRAWMODE_WORK,
+                          rect, dx, dy );
+          rect->w = w;
      }
 
 out:
@@ -1104,7 +1321,7 @@ sh_2dg_stretch_blit( void *driver_data,
           points[3].x = drect->x;
           points[3].y = drect->y + drect->h - 1;
 
-          rc = copy_quad( drv, dev, srect, points );
+          rc = copy_quad( drv, dev, dev->mode, srect, points );
      }
 
      return (rc >= 0);
@@ -1121,12 +1338,15 @@ sh_2dg_set_funcs( GraphicsDeviceFuncs *funcs )
 {
      funcs->EngineReset       = sh_2dg_engine_reset;
      funcs->EngineSync        = sh_2dg_engine_sync;
-//     funcs->FlushTextureCache = sh_2dg_flush_texture_cache;
      funcs->EmitCommands      = sh_2dg_emit_commands;
      funcs->CheckState        = sh_2dg_check_state;
      funcs->SetState          = sh_2dg_set_state;
      funcs->FillRectangle     = sh_2dg_fill_rectangle;
+     funcs->DrawRectangle     = sh_2dg_draw_rectangle;
+     funcs->DrawLine          = sh_2dg_draw_line;
      funcs->FillTriangle      = sh_2dg_fill_triangle;
+     funcs->FillTrapezoid     = sh_2dg_fill_trapezoid;
+     funcs->FillQuadrangles   = sh_2dg_fill_quadrangles;
      funcs->Blit              = sh_2dg_blit;
      funcs->StretchBlit       = sh_2dg_stretch_blit;
 }

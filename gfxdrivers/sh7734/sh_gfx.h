@@ -24,10 +24,8 @@ typedef struct {
      CoreDFB    *dfb;
      CoreScreen *screen;
      CoreLayer  *layers[SH_GFX_NUM_LAYERS];
-     
-     int gfx_fd;
-     int dpy_fd;
-
+     int         gfx_fd;
+     int         dpy_fd;
 } SHGfxDriverData;
 
 #endif /* __SH_GFX_H__ */

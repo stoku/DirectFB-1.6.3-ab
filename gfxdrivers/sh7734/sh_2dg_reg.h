@@ -160,6 +160,7 @@
 #define SH_2DG_SYNC(mode)	(0x12000000 | (mode))
 #define SH_2DG_POLYGON4A(mode)	(0x82000000 | ((mode) & 0x3BFF))
 #define SH_2DG_POLYGON4C(mode)	(0x80000000 | ((mode) & 0x323E))
+#define SH_2DG_LINEC(mode)	(0xB0000000 | ((mode) & 0x361E))
 #define SH_2DG_FTRAPC(mode)	(0xD0000020 | ((mode) & 0x3618))
 #define SH_2DG_CLRWC(mode)	(0xE0000020 | ((mode) & 0x3000))
 #define SH_2DG_BITBLTA(mode)	(0xA2000000 | ((mode) & 0x3FFF))

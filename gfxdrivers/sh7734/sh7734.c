@@ -61,32 +61,31 @@ driver_init_driver( CoreGraphicsDevice  *device,
                     void                *device_data,
                     CoreDFB             *core )
 {
-     SHGfxDriverData *shdrv;
+     SHGfxDriverData *drv;
      int i;
 
      D_DEBUG_AT( SH7734, "%s()\n", __FUNCTION__ );
      D_UNUSED_P( device_data );
 
-     shdrv = (SHGfxDriverData *)driver_data;
+     drv = (SHGfxDriverData *)driver_data;
 
-     shdrv->dfb = core;
+     drv->dfb = core;
 
-     shdrv->gfx_fd = open( "/dev/sh_2dg", O_RDWR );
-     if (shdrv->gfx_fd < 0)
+     drv->gfx_fd = open( "/dev/sh_2dg", O_RDWR );
+     if (drv->gfx_fd < 0)
           return DFB_INIT;
 
-     shdrv->dpy_fd = open( "/dev/sh_du", O_RDWR );
-     if (shdrv->dpy_fd < 0) {
-          close(shdrv->gfx_fd);
-          shdrv->gfx_fd = 0;
+     drv->dpy_fd = open( "/dev/sh_du", O_RDWR );
+     if (drv->dpy_fd < 0) {
+          close(drv->gfx_fd);
+          drv->gfx_fd = 0;
           return DFB_INIT;
      }
 
      sh_2dg_set_funcs(funcs);
-     shdrv->screen = sh_du_screen_register( device, driver_data );
+     drv->screen = sh_du_screen_register( device, driver_data );
      for (i = 0; i < SH_GFX_NUM_LAYERS; i++)
-          shdrv->layers[i] = sh_du_layer_register( shdrv->screen,
-                                                   driver_data );
+          drv->layers[i] = sh_du_layer_register( drv->screen, driver_data );
 
      return DFB_OK;
 }
@@ -114,13 +113,13 @@ static void
 driver_close_driver( CoreGraphicsDevice *device,
                      void               *driver_data )
 {
-     SHGfxDriverData *shdrv;
+     SHGfxDriverData *drv;
 
      D_DEBUG_AT( SH7734, "%s()\n", __FUNCTION__ );
      D_UNUSED_P( device );
 
-     shdrv = (SHGfxDriverData *)driver_data;
-     close(shdrv->dpy_fd);
-     close(shdrv->gfx_fd);
+     drv = (SHGfxDriverData *)driver_data;
+     close(drv->dpy_fd);
+     close(drv->gfx_fd);
 }
 

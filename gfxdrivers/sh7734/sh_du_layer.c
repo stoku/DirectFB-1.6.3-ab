@@ -392,7 +392,7 @@ sh_du_init_layer( CoreLayer                  *layer,
      description->sources      = 0;
      description->clip_regions = 0;
      description->surface_caps = DSCAPS_VIDEOONLY |
-                                 DSCAPS_DOUBLE |
+//                                 DSCAPS_DOUBLE |
                                  DSCAPS_SHARED;
 
      snprintf( description->name, DFB_DISPLAY_LAYER_DESC_NAME_LENGTH,
@@ -495,8 +495,14 @@ sh_du_test_region( CoreLayer                  *layer,
           break;
      }
 
-     if (config->buffermode != DLBM_BACKVIDEO)
+     switch (config->buffermode) {
+     case DLBM_FRONTONLY:
+     case DLBM_BACKVIDEO:
+          break;
+     default:
           fail |= CLRCF_BUFFERMODE;
+          break;
+     }
 
      if (D_FLAGS_INVALID( config->options, DLOP_ALPHACHANNEL |
                                            DLOP_SRC_COLORKEY |
@@ -574,8 +580,10 @@ sh_du_set_region( CoreLayer                  *layer,
      SHDuLayerData   *lyr;
      u32             *pal, dirty;
 
-     D_DEBUG_AT( SH_DU_LAYER, "%s( %u, 0x%x )\n",
-                 __FUNCTION__, dfb_layer_id( layer ), updated );
+     D_DEBUG_AT( SH_DU_LAYER, "%s( %u, 0x%x, 0x%lx )\n",
+                 __FUNCTION__, dfb_layer_id( layer ), updated,
+                 D_FLAGS_IS_SET( updated, CLRCF_SURFACE ) ?
+                 left_lock->phys : 0 );
      D_UNUSED_P( region_data );
      D_UNUSED_P( surface );
      D_UNUSED_P( right_lock );
@@ -821,8 +829,8 @@ sh_du_flip_region( CoreLayer             *layer,
      SHGfxDriverData *drv;
      SHDuLayerData   *lyr;
  
-     D_DEBUG_AT( SH_DU_LAYER, "%s( %u, 0x%x )\n",
-                 __FUNCTION__, dfb_layer_id( layer ), flags );
+     D_DEBUG_AT( SH_DU_LAYER, "%s( %u, 0x%x, 0x%lx )\n",
+                 __FUNCTION__, dfb_layer_id( layer ), flags, left_lock->phys );
      D_UNUSED_P( region_data );
      D_UNUSED_P( right_lock );
 
@@ -836,6 +844,7 @@ sh_du_flip_region( CoreLayer             *layer,
      if (ret)
           goto out;
 
+     D_ASSERT( lyr->plane.pa0 != left_lock->phys );
      lyr->plane.pa0 = left_lock->phys;
      ret = update_layer( drv, lyr, PLANE_PA0, NULL );
      if (ret)
@@ -866,19 +875,31 @@ sh_du_update_region( CoreLayer             *layer,
                      const DFBRegion       *right_update,
                      CoreSurfaceBufferLock *right_lock )
 {
-     D_DEBUG_AT( SH_DU_LAYER, "%s( %u )\n",
-                 __FUNCTION__, dfb_layer_id( layer ) );
-     D_UNUSED_P( layer );
-     D_UNUSED_P( driver_data );
-     D_UNUSED_P( layer_data );
+     DFBResult             ret;
+     SHGfxDriverData      *drv;
+     SHDuLayerData        *lyr;
+ 
+     D_DEBUG_AT( SH_DU_LAYER, "%s( %u, 0x%lx )\n",
+                 __FUNCTION__, dfb_layer_id( layer ), left_lock->phys );
      D_UNUSED_P( region_data );
-     D_UNUSED_P( surface );
      D_UNUSED_P( left_update );
-     D_UNUSED_P( left_lock );
-     D_UNUSED_P( right_update );
      D_UNUSED_P( right_lock );
+     D_UNUSED_P( right_update );
 
-     return DFB_UNSUPPORTED;
+     drv = (SHGfxDriverData *)driver_data;
+     lyr = (SHDuLayerData *)layer_data;
+     
+     if (lyr->plane.pa0 != left_lock->phys) {
+          lyr->plane.pa0 = left_lock->phys;
+          ret = update_layer( drv, lyr, PLANE_PA0, NULL );
+          if (ret)
+               goto out;
+     }
+
+     ret = sh_du_show_layer( dfb_layer_screen( layer ), driver_data, lyr->id );
+
+out:
+     return ret;
 }
 
 static const DisplayLayerFuncs sh_du_layer_funcs = {
