@@ -14,7 +14,9 @@
  */
 
 #include <linux/kernel.h>
+#include <linux/module.h>
 #include <linux/interrupt.h>
+#include <linux/clk.h>
 #include <linux/wait.h>
 #include <linux/slab.h>
 #include <linux/fs.h>
@@ -45,7 +47,8 @@ struct sh_du_miscdevice {
 		u8		*base;
 		resource_size_t	size;
 	} reg;
-	struct miscdevice	mdev;
+	struct clk		*clk;
+	struct miscdevice	misc;
 };
 
 static struct sh_du_miscdevice *sh_du_create(void)
@@ -64,7 +67,7 @@ static void sh_du_delete(struct sh_du_miscdevice *dev)
 static struct sh_du_miscdevice *sh_du_get(struct file *filp)
 {
 	struct miscdevice *d = (struct miscdevice *)filp->private_data;
-	return (!d) ? NULL : container_of(d, struct sh_du_miscdevice, mdev);
+	return (!d) ? NULL : container_of(d, struct sh_du_miscdevice, misc);
 }
 
 static long sh_du_access(struct sh_du_miscdevice *dev,
@@ -214,20 +217,19 @@ static int sh_du_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	shdev->reg.size = resource_size(res);
-	shdev->reg.base = (u8 *)ioremap(res->start, shdev->reg.size);
+	shdev->reg.base = (u8 *)ioremap_nocache(res->start, shdev->reg.size);
 
 	if (!shdev->reg.base) {
 		dev_err(&pdev->dev, "ioremap failed\n");
 		ret = -EIO;
 		goto err_free;
 	}
-
 	if (pdev->id < 0)
-		snprintf("%s", sizeof(shdev->name) - 1,
-			shdev->name, pdev->name);
+		snprintf(shdev->name, sizeof(shdev->name) - 1,
+			"%s", pdev->name);
 	else
-		snprintf("%s%d", sizeof(shdev->name) - 1,
-			shdev->name, pdev->name, pdev->id);
+		snprintf(shdev->name, sizeof(shdev->name) - 1,
+			"%s%d", pdev->name, pdev->id);
 
 	init_waitqueue_head(&shdev->queue);
 	shdev->irq = platform_get_irq(pdev, 0);
@@ -237,20 +239,37 @@ static int sh_du_probe(struct platform_device *pdev)
 		goto err_unmap;
 	}
 
-	shdev->mdev.name = shdev->name;
-	shdev->mdev.minor = MISC_DYNAMIC_MINOR;
-	shdev->mdev.fops = &sh_du_fops;
+	shdev->misc.name = shdev->name;
+	shdev->misc.minor = MISC_DYNAMIC_MINOR;
+	shdev->misc.fops = &sh_du_fops;
 
-	ret = misc_register(&shdev->mdev);
+	ret = misc_register(&shdev->misc);
 	if (ret) {
-		pr_err("2h_du: misc_register failed\n");
+		dev_err(&pdev->dev, "misc_register failed\n");
 		goto err_irq;
 	}
 
+        shdev->clk = clk_get(&pdev->dev, "view");
+	if (IS_ERR(shdev->clk)) {
+		dev_err(&pdev->dev, "clk_get failed\n");
+		ret = PTR_ERR(shdev->clk);
+		goto err_misc;
+	}
+	ret = clk_enable(shdev->clk);
+	if (ret) {
+		dev_err(&pdev->dev, "clk_enable failed\n");
+		goto err_clk;
+	}
+
 	platform_set_drvdata(pdev, shdev);
+	dev_info(&pdev->dev, "misc device registered\n");
 
 	return ret;
 
+err_clk:
+	clk_put(shdev->clk);
+err_misc:
+	misc_deregister(&shdev->misc);
 err_irq:
 	free_irq(shdev->irq, shdev);
 err_unmap:
@@ -267,7 +286,9 @@ static int sh_du_remove(struct platform_device *pdev)
 	shdev = (struct sh_du_miscdevice *)platform_get_drvdata(pdev);
 
 	platform_set_drvdata(pdev, NULL);
-	misc_deregister(&shdev->mdev);
+	clk_disable(shdev->clk);
+	clk_put(shdev->clk);
+	misc_deregister(&shdev->misc);
 	free_irq(shdev->irq, shdev);
 	iounmap(shdev->reg.base);
 	sh_du_delete(shdev);
@@ -294,11 +315,18 @@ static struct resource sh_du_resources[] = {
 	},
 };
 
+static void sh_du_device_release(struct device *dev)
+{
+}
+
 static struct platform_device sh_du_device = {
 	.name		= "sh_du",
 	.id		= -1,
 	.resource	= sh_du_resources,
 	.num_resources	= ARRAY_SIZE(sh_du_resources),
+	.dev = {
+		.release = sh_du_device_release,
+	},
 };
 
 static int __init sh_du_driver_init(void)
@@ -325,4 +353,8 @@ static void __exit sh_du_driver_exit(void)
 }
 
 module_exit(sh_du_driver_exit);
+
+MODULE_DESCRIPTION("Renesas DU driver");
+MODULE_AUTHOR("Sosuke Tokunaga");
+MODULE_LICENSE("GPL");
 

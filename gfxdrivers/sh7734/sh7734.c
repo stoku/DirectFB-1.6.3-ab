@@ -15,11 +15,14 @@
 
 #include <config.h>
 #include <direct/util.h>
+#include <direct/debug.h>
 #include <core/graphics_driver.h>
 #include "sh_gfx.h"
 #include "sh_2dg_gfx.h"
 #include "sh_du_screen.h"
 #include "sh_du_layer.h"
+
+D_DEBUG_DOMAIN( SH7734, "SH7734", "Renesas SH7734 Driver" );
 
 DFB_GRAPHICS_DRIVER( sh7734 )
 
@@ -33,6 +36,7 @@ static void
 driver_get_info( CoreGraphicsDevice *device,
                  GraphicsDriverInfo *info )
 {
+     D_DEBUG_AT( SH7734, "%s()\n", __FUNCTION__ );
      D_UNUSED_P( device );
 
      /* fill driver info structure */
@@ -60,8 +64,8 @@ driver_init_driver( CoreGraphicsDevice  *device,
      SHGfxDriverData *shdrv;
      int i;
 
+     D_DEBUG_AT( SH7734, "%s()\n", __FUNCTION__ );
      D_UNUSED_P( device_data );
-     D_UNUSED_P( core );
 
      shdrv = (SHGfxDriverData *)driver_data;
 
@@ -93,6 +97,7 @@ driver_init_device( CoreGraphicsDevice *device,
                     void               *driver_data,
                     void               *device_data )
 {
+     D_DEBUG_AT( SH7734, "%s()\n", __FUNCTION__ );
      return sh_2dg_init( device, device_info, driver_data, device_data );
 }
 
@@ -101,6 +106,7 @@ driver_close_device( CoreGraphicsDevice *device,
                      void               *driver_data,
                      void               *device_data )
 {
+     D_DEBUG_AT( SH7734, "%s()\n", __FUNCTION__ );
      sh_2dg_exit( device, driver_data, device_data );
 }
 
@@ -110,6 +116,7 @@ driver_close_driver( CoreGraphicsDevice *device,
 {
      SHGfxDriverData *shdrv;
 
+     D_DEBUG_AT( SH7734, "%s()\n", __FUNCTION__ );
      D_UNUSED_P( device );
 
      shdrv = (SHGfxDriverData *)driver_data;

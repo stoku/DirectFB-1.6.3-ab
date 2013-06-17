@@ -15,6 +15,7 @@
 
 #include <sys/ioctl.h>
 #include <direct/util.h>
+#include <direct/debug.h>
 #include <fusion/call.h>
 #include <core/screens_internal.h>
 #include "modules/sh_du.h"
@@ -42,6 +43,13 @@
 #define SH_DU_LAYER_VALUE_IS_VALID(v)      ((v) <= 0x0F)
 #define SH_DU_LAYER_PLANE_IS_VALID(p)      ((p) <= 0x07)
 #define SH_DU_LAYER_PRIORITY_IS_VALID(p)   ((p) <= 0x07)
+
+#define SH_DU_LAYER_LEVEL_MIN              (0)
+#define SH_DU_LAYER_LEVEL_MAX              (7)
+#define SH_DU_LAYER_LEVEL_TO_PRIORITY(l)   (u8)(7 - (l))
+#define SH_DU_LAYER_PRIORITY_TO_LEVEL(p)   (7 - (int)(p))
+
+D_DEBUG_DOMAIN( SH_DU_SCREEN, "SH-DU/Screen", "Renesas DU Screen" );
 
 enum SHDuTimingReg {
      HDS,
@@ -140,6 +148,7 @@ size_to_resolution(const DFBDimension *size)
 static int
 sh_du_screen_data_size( void )
 {
+     D_DEBUG_AT( SH_DU_SCREEN, "%s()\n", __FUNCTION__ );
      return sizeof(SHDuScreenData);
 }
 
@@ -150,6 +159,7 @@ sh_du_init_screen( CoreScreen           *screen,
                    void                 *screen_data,
                    DFBScreenDescription *description )
 {
+     D_DEBUG_AT( SH_DU_SCREEN, "%s()\n", __FUNCTION__ );
      D_UNUSED_P( screen );
      D_UNUSED_P( device );
      D_UNUSED_P( driver_data );
@@ -170,6 +180,7 @@ sh_du_shutdown_screen( CoreScreen *screen,
                         void       *driver_data,
                         void       *screen_data )
 {
+     D_DEBUG_AT( SH_DU_SCREEN, "%s()\n", __FUNCTION__ );
      D_UNUSED_P( screen );
      D_UNUSED_P( driver_data );
      D_UNUSED_P( screen_data );
@@ -190,6 +201,7 @@ sh_du_init_mixer( CoreScreen                *screen,
      struct sh_du_reg reg;
      int i;
 
+     D_DEBUG_AT( SH_DU_SCREEN, "%s( %d )\n", __FUNCTION__, mixer );
      D_UNUSED_P( screen );
 
      if (mixer != 0)
@@ -252,6 +264,7 @@ sh_du_init_output( CoreScreen *screen,
      SHDuScreenData  *scr;
      struct sh_du_reg reg;
 
+     D_DEBUG_AT( SH_DU_SCREEN, "%s( %d )\n", __FUNCTION__, output );
      D_UNUSED_P( screen );
 
      if (output != 0)
@@ -319,6 +332,7 @@ sh_du_wait_vsync( CoreScreen *screen,
      SHGfxDriverData *drv;
      struct sh_du_status status;
 
+     D_DEBUG_AT( SH_DU_SCREEN, "%s()\n", __FUNCTION__ );
      D_UNUSED_P( screen );
      D_UNUSED_P( screen_data );
 
@@ -339,6 +353,7 @@ sh_du_test_mixer_config( CoreScreen                 *screen,
      SHDuScreenData            *scr;
      DFBScreenMixerConfigFlags  fail;
 
+     D_DEBUG_AT( SH_DU_SCREEN, "%s( %d )\n", __FUNCTION__, mixer );
      D_UNUSED_P( screen );
      D_UNUSED_P( driver_data );
      D_UNUSED_P( screen_data );
@@ -360,7 +375,8 @@ sh_du_test_mixer_config( CoreScreen                 *screen,
          D_FLAGS_INVALID( config->layers, added_layers( scr ) ))
           fail |= DSMCONF_LAYERS;
 
-     *failed = fail;
+     if (failed)
+          *failed = fail;
 
      return (fail == DSMCONF_NONE) ? DFB_OK : DFB_UNSUPPORTED;
 }
@@ -374,6 +390,9 @@ sh_du_set_mixer_config( CoreScreen                 *screen,
 {
      SHGfxDriverData *drv;
      SHDuScreenData  *scr;
+
+     D_DEBUG_AT( SH_DU_SCREEN, "%s( %d )\n", __FUNCTION__, mixer );
+     D_UNUSED_P( screen );
 
      if (mixer != 0)
           return DFB_INVARG;
@@ -433,6 +452,7 @@ sh_du_test_output_config( CoreScreen                  *screen,
 {
      DFBScreenOutputConfigFlags fail;
 
+     D_DEBUG_AT( SH_DU_SCREEN, "%s( %d )\n", __FUNCTION__, output );
      D_UNUSED_P( screen );
      D_UNUSED_P( driver_data );
      D_UNUSED_P( screen_data );
@@ -469,7 +489,8 @@ sh_du_test_output_config( CoreScreen                  *screen,
           }
      }
 
-     *failed = fail;
+     if (failed)
+          *failed = fail;
 
      return (fail == DSOCONF_NONE) ? DFB_OK : DFB_UNSUPPORTED;
 }
@@ -484,6 +505,7 @@ sh_du_set_output_config( CoreScreen                  *screen,
      SHGfxDriverData *drv;
      SHDuScreenData  *scr;
 
+     D_DEBUG_AT( SH_DU_SCREEN, "%s( %d )\n", __FUNCTION__ , output );
      D_UNUSED_P( screen );
 
      if (output != 0)
@@ -592,8 +614,9 @@ sh_du_get_screen_size( CoreScreen *screen,
 {
      SHDuScreenData *scr;
 
-     D_UNUSED_P(screen);
-     D_UNUSED_P(driver_data);
+     D_DEBUG_AT( SH_DU_SCREEN, "%s()\n", __FUNCTION__ );
+     D_UNUSED_P( screen );
+     D_UNUSED_P( driver_data );
 
      scr = (SHDuScreenData *)screen_data;
 
@@ -628,22 +651,38 @@ sh_du_add_layer( CoreScreen *screen,
                  void *driver_data,
                  DFBDisplayLayerID  id,
                  u8 plane,
-                 u8 priority )
+                 int *level )
 {
      SHGfxDriverData *drv;
      SHDuScreenData  *scr;
+     u8               pri;
 
      drv = (SHGfxDriverData *)driver_data;
      scr = (SHDuScreenData *)screen->screen_data;
 
      D_ASSERT( id < SH_GFX_NUM_LAYERS );
-     D_ASSERT( SH_DU_LAYER_PLANE_IS_VALID( plane ) );
-     D_ASSERT( SH_DU_LAYER_PRIORITY_IS_VALID( priority ) );
-     D_ASSUME( !SH_DU_LAYER_PRIORITY_IS_VALID( scr->layer.priorities[id] ) );
-     D_ASSUME( !SH_DU_LAYER_VALUE_IS_VALID( scr->layer.values[priority] ) );
+     D_ASSERT( SH_DU_LAYER_PLANE_IS_VALID( plane ));
 
-     scr->layer.priorities[id]   = priority;
-     scr->layer.values[priority] = plane | SH_DU_LAYER_VISIBLE;
+     if (SH_DU_LAYER_PRIORITY_IS_VALID( scr->layer.priorities[id] ))
+          return DFB_BUSY; /* already added */
+
+     pri = plane; /* default priority is plane id */
+
+     if (SH_DU_LAYER_VALUE_IS_VALID( scr->layer.values[pri] )) {
+         while (++pri < D_ARRAY_SIZE( scr->layer.values ) &&
+                SH_DU_LAYER_VALUE_IS_VALID( scr->layer.values[pri] ));
+     }
+     if (pri >= D_ARRAY_SIZE( scr->layer.values )) {
+          pri = plane;
+          while ((pri > 0) &&
+                 SH_DU_LAYER_PRIORITY_IS_VALID( scr->layer.values[pri] ))
+               pri--;
+     }
+     if (SH_DU_LAYER_VALUE_IS_VALID( scr->layer.values[pri] ))
+          return DFB_BUSY; /* all priorities assigned */
+
+     scr->layer.priorities[id] = pri;
+     scr->layer.values[pri]    = plane;
 
      return update_layers( drv, scr ) ? DFB_IO : DFB_OK;
 }
@@ -663,8 +702,8 @@ sh_du_remove_layer( CoreScreen *screen,
      scr = (SHDuScreenData *)screen->screen_data;
      pri = scr->layer.priorities[id];
 
-     D_ASSUME( SH_DU_LAYER_PRIORITY_IS_VALID( pri ) );
-     D_ASSUME( SH_DU_LAYER_VALUE_IS_VALID( scr->layer.values[pri] ) );
+     if (!SH_DU_LAYER_PRIORITY_IS_VALID( pri ))
+          return DFB_OK; /* already removed */
 
      scr->layer.priorities[id] = SH_DU_LAYER_INVALID_PRIORITY;
      scr->layer.values[pri]    = SH_DU_LAYER_INVALID_VALUE;
@@ -673,33 +712,36 @@ sh_du_remove_layer( CoreScreen *screen,
 }
 
 DFBResult
-sh_du_change_layer_priority( CoreScreen *screen,
-                             void *driver_data,
-                             DFBDisplayLayerID id,
-                             u8 priority )
+sh_du_change_layer_level( CoreScreen *screen,
+                          void *driver_data,
+                          DFBDisplayLayerID id,
+                          int level )
 {
      SHGfxDriverData *drv;
      SHDuScreenData  *scr;
-     u8 current;
+     u8 current, pri;
 
      D_ASSERT( id < SH_GFX_NUM_LAYERS );
+     if ((level < SH_DU_LAYER_LEVEL_MIN) || (level > SH_DU_LAYER_LEVEL_MAX))
+          return DFB_INVARG;
 
      drv     = (SHGfxDriverData *)driver_data;
      scr     = (SHDuScreenData *)screen->screen_data;
      current = scr->layer.priorities[id];
+     pri     = SH_DU_LAYER_LEVEL_TO_PRIORITY( level );
 
-     D_ASSERT( SH_DU_LAYER_PRIORITY_IS_VALID( priority ) );
-     D_ASSERT( SH_DU_LAYER_PRIORITY_IS_VALID( current ) );
+     if ( !SH_DU_LAYER_PRIORITY_IS_VALID( current ))
+          return DFB_INVARG;
 
-     if ( current == priority )
+     if ( current == pri )
           return DFB_OK;
 
-     if (SH_DU_LAYER_VALUE_IS_VALID( scr->layer.values[priority] ))
+     if (SH_DU_LAYER_VALUE_IS_VALID( scr->layer.values[pri] ))
           return DFB_BUSY;
 
-     scr->layer.values[priority] = scr->layer.values[current];
-     scr->layer.values[current]  = SH_DU_LAYER_INVALID_VALUE;
-     scr->layer.priorities[id]   = priority;
+     scr->layer.values[pri]    = scr->layer.values[current];
+     scr->layer.values[current] = SH_DU_LAYER_INVALID_VALUE;
+     scr->layer.priorities[id] = pri;
 
      return update_layers( drv, scr ) ? DFB_IO : DFB_OK;
 }

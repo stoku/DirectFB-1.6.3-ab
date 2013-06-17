@@ -15,6 +15,7 @@
 
 #include <sys/ioctl.h>
 #include <direct/util.h>
+#include <direct/debug.h>
 #include <core/layers.h>
 #include <core/layer_control.h>
 #include <core/screen.h>
@@ -28,21 +29,21 @@
 #define SH_DU_READ(fd, reg)            ioctl((fd), SH_DU_IOC_GETREG, &(reg))
 #define SH_DU_WRITE(fd, reg)           ioctl((fd), SH_DU_IOC_SETREG, &(reg))
 
-#define SH_DU_PMR_MASK                 (0x1C1377B3)
-#define SH_DU_PMWR_MASK                (0x00001FF0)
-#define SH_DU_PALPHAR_MASK             (0x000037FF)
-#define SH_DU_PDSXR_MASK               (0x000007FF)
-#define SH_DU_PDSYR_MASK               (0x000003FF)
-#define SH_DU_PDPXR_MASK               (0x000007FF)
-#define SH_DU_PDPYR_MASK               (0x000003FF)
-#define SH_DU_PDSAR_MASK               (0xFFFFFFF0)
-#define SH_DU_PSPXR_MASK               (0x00000FFF)
-#define SH_DU_PSPYR_MASK               (0x0000FFFF)
-#define SH_DU_PTC1R_MASK               (0x000000FF)
-#define SH_DU_PTC2R_MASK               (0x0000FFFF)
+#define SH_DU_MASK_PMR                 (0x1C1377B3)
+#define SH_DU_MASK_PMWR                (0x00001FF0)
+#define SH_DU_MASK_PALPHAR             (0x000037FF)
+#define SH_DU_MASK_PDSXR               (0x000007FF)
+#define SH_DU_MASK_PDSYR               (0x000003FF)
+#define SH_DU_MASK_PDPXR               (0x000007FF)
+#define SH_DU_MASK_PDPYR               (0x000003FF)
+#define SH_DU_MASK_PDSAR               (0xFFFFFFF0)
+#define SH_DU_MASK_PSPXR               (0x00000FFF)
+#define SH_DU_MASK_PSPYR               (0x0000FFFF)
+#define SH_DU_MASK_PTC1R               (0x000000FF)
+#define SH_DU_MASK_PTC2R               (0x0000FFFF)
 
 #define SH_DU_CHECK_REG_VALUE(name, value) \
-        D_ASSUME( D_FLAGS_ARE_IN( value, SH_DU_##name_MASK ) )
+        D_ASSUME( D_FLAGS_ARE_IN( value, SH_DU_MASK_##name ) )
 
 #define SH_DU_PLANE_SET_DIRTY(flags, f) \
         D_FLAGS_SET( flags, PLANE_##f )
@@ -63,9 +64,7 @@
                                         (((u32)(c).g & 0xFC) <<  8) | \
                                         (((u32)(c).b & 0xFC) <<  0))
 
-#define SH_DU_MIN_LEVEL                (0)
-#define SH_DU_MAX_LEVEL                (7)
-#define SH_DU_LEVEL_TO_PRIORITY(l)     (u8)(7 - (l))
+D_DEBUG_DOMAIN( SH_DU_LAYER, "SH-DU/Layer", "Renesas DU Layer" );
 
 enum SHDUPlaneReg {
      PLANE_MODE    = (1 << 0),
@@ -97,7 +96,7 @@ typedef struct {
      u8                opacity;
      DFBColorKey       ckey;
      struct {
-          u32 id;
+          u8  id;
           u32 mode;
           u32 pa0;
           u32 pa1;
@@ -116,15 +115,16 @@ typedef struct {
 } SHDuLayerData;
 
 static void
-init_layer( SHGfxDriverData *drv,
+init_layer( const SHGfxDriverData *drv,
             SHDuLayerData *layer,
             DFBDisplayLayerID id,
-            DFBDisplayLayerConfig *config )
+            const CoreLayerRegionConfig *config )
 {
      struct sh_du_reg reg;
 
      layer->id            = id;
-     layer->level         = 7 - (2 * (int)id);
+     /* NOTE: layer->level is assigned after added */
+     layer->level         = -1;
      layer->sx            = 0;
      layer->sy            = 0;
      layer->dx            = 0;
@@ -137,7 +137,7 @@ init_layer( SHGfxDriverData *drv,
      layer->ckey.g        = 0;
      layer->ckey.b        = 0;
 
-     layer->plane.id      = 2 * id;
+     layer->plane.id      = (u8)(2 * id);
      layer->plane.mode    = SH_DU_PMR_CPSL(id);
      layer->plane.pa0     = 0;
      layer->plane.pa1     = 0;
@@ -161,7 +161,7 @@ init_layer( SHGfxDriverData *drv,
           layer->plane.mode |= SH_DU_PMR_NOSRCKEY;
      }
 
-     switch (config->pixelformat) {
+     switch (config->format) {
      case DSPF_RGB16:
           layer->plane.mode |= SH_DU_PMR_DDF565;
           break;
@@ -171,7 +171,7 @@ init_layer( SHGfxDriverData *drv,
                layer->plane.opacity |= SH_DU_PALPHAR_ABIT_IGNORE;
           break;
      default:
-          D_ASSERT( config->pixelformat == DSPF_LUT8 );
+          D_ASSERT( config->format == DSPF_LUT8 );
           layer->plane.mode |= SH_DU_PMR_DDF8;
           break;
      }
@@ -193,9 +193,10 @@ update_layer( const SHGfxDriverData *drv,
               u32 dirty,
               const u32 *palette )
 {
-     int fd, i;
-     struct sh_du_reg reg;
+     int fd;
+     u8 i;
      u32 dsys;
+     struct sh_du_reg reg;
 
      fd = drv->dpy_fd;
      i  = layer->plane.id;
@@ -334,12 +335,14 @@ err_out:
 static int
 sh_du_layer_data_size( void )
 {
+     D_DEBUG_AT( SH_DU_LAYER, "%s()\n", __FUNCTION__ );
      return sizeof(SHDuLayerData);
 }
 
 static int
 sh_du_region_data_size( void )
 {
+     D_DEBUG_AT( SH_DU_LAYER, "%s()\n", __FUNCTION__ );
      return 0;
 }
 
@@ -351,14 +354,13 @@ sh_du_init_layer( CoreLayer                  *layer,
                   DFBDisplayLayerConfig      *config,
                   DFBColorAdjustment         *adjustment )
 {
-     SHGfxDriverData   *drv;
-     SHDuLayerData     *lyr;
      DFBResult          ret;
 
+     D_DEBUG_AT( SH_DU_LAYER, "%s()\n", __FUNCTION__ );
+     D_UNUSED_P( driver_data );
+     D_UNUSED_P( layer_data );
      D_UNUSED_P( adjustment );
 
-     drv = (SHGfxDriverData *)driver_data;
-     lyr = (SHDuLayerData *)layer_data;
      ret = dfb_screen_get_screen_size( dfb_layer_screen( layer ),
                                        &config->width, &config->height );
      if (ret)
@@ -375,11 +377,6 @@ sh_du_init_layer( CoreLayer                  *layer,
                            DLCONF_BUFFERMODE |
                            DLCONF_OPTIONS;
 
-     init_layer( drv, lyr, dfb_layer_id( layer ), config );
-     ret = update_layer( drv, lyr, PLANE_ALL, NULL );
-     if (ret)
-          goto out;
-
      description->type         = DLTF_GRAPHICS | DLTF_STILL_PICTURE;
      description->caps         = DLCAPS_SURFACE |
                                  DLCAPS_OPACITY |
@@ -388,7 +385,7 @@ sh_du_init_layer( CoreLayer                  *layer,
                                  DLCAPS_LEVELS |
                                  DLCAPS_SCREEN_POSITION |
                                  DLCAPS_SCREEN_SIZE;
-     description->level        = lyr->level;
+     description->level        = -1;
      description->regions      = 1;
      description->sources      = 0;
      description->clip_regions = 0;
@@ -397,7 +394,7 @@ sh_du_init_layer( CoreLayer                  *layer,
                                  DSCAPS_SHARED;
 
      snprintf( description->name, DFB_DISPLAY_LAYER_DESC_NAME_LENGTH,
-               "SH DU Layer %d", lyr->id );
+               "SH DU Layer" );
 
 out:
      return ret;
@@ -408,6 +405,12 @@ sh_du_shutdown_layer( CoreLayer *layer,
                       void      *driver_data,
                       void      *layer_data )
 {
+     D_DEBUG_AT( SH_DU_LAYER, "%s( %u )\n",
+                 __FUNCTION__, dfb_layer_id( layer ) );
+     D_UNUSED_P( layer );
+     D_UNUSED_P( driver_data );
+     D_UNUSED_P( layer_data );
+
      return DFB_OK;
 }
 
@@ -419,6 +422,8 @@ DFBResult sh_du_get_level( CoreLayer *layer,
 {
      SHDuLayerData *lyr;
 
+     D_DEBUG_AT( SH_DU_LAYER, "%s( %u )\n",
+                 __FUNCTION__, dfb_layer_id( layer ) );
      D_UNUSED_P( layer );
      D_UNUSED_P( driver_data );
 
@@ -436,18 +441,15 @@ sh_du_set_level( CoreLayer *layer,
      DFBResult      ret;
      SHDuLayerData *lyr;
 
-     if ((level < SH_DU_MIN_LEVEL) || (level > SH_DU_MAX_LEVEL))
-          return DFB_INVARG;
+     D_DEBUG_AT( SH_DU_LAYER, "%s( %u, %d )\n",
+                 __FUNCTION__, dfb_layer_id( layer ), level );
 
      lyr = (SHDuLayerData *)layer_data;
      if (lyr->level == level)
           return DFB_OK;
 
-     ret = sh_du_change_layer_priority( dfb_layer_screen( layer ),
-                                        driver_data,
-                                        lyr->id,
-                                        SH_DU_LEVEL_TO_PRIORITY(level));
-
+     ret = sh_du_change_layer_level( dfb_layer_screen( layer ),
+                                     driver_data, lyr->id, level);
      if (ret == DFB_OK)
           lyr->level = level;
 
@@ -465,6 +467,8 @@ sh_du_test_region( CoreLayer                  *layer,
      DFBResult result;
      int w, h;
 
+     D_DEBUG_AT( SH_DU_LAYER, "%s( %u )\n",
+                 __FUNCTION__, dfb_layer_id( layer ) );
      D_UNUSED_P( driver_data );
      D_UNUSED_P( layer_data );
 
@@ -518,7 +522,8 @@ sh_du_test_region( CoreLayer                  *layer,
      if (config->num_clips > 0)
           fail |= CLRCF_CLIPS;
 
-     *failed = fail;
+     if (failed)
+          *failed = fail;
 
      return (fail == CLRCF_NONE) ? DFB_OK : DFB_UNSUPPORTED;
 }
@@ -530,13 +535,24 @@ sh_du_add_region( CoreLayer             *layer,
                   void                  *region_data,
                   CoreLayerRegionConfig *config )
 {
-     D_UNUSED_P( layer );
-     D_UNUSED_P( driver_data );
-     D_UNUSED_P( layer_data );
-     D_UNUSED_P( region_data );
-     D_UNUSED_P( config );
+     SHGfxDriverData *drv;
+     SHDuLayerData   *lyr;
+     DFBResult        ret;
 
-     return DFB_OK;
+     D_DEBUG_AT( SH_DU_LAYER, "%s( %u )\n",
+                 __FUNCTION__, dfb_layer_id( layer ) );
+     D_UNUSED_P( region_data );
+
+     drv = (SHGfxDriverData *)driver_data;
+     lyr = (SHDuLayerData *)layer_data;
+
+     init_layer( drv, lyr, dfb_layer_id( layer ), config );
+     ret = update_layer( drv, lyr, PLANE_ALL, NULL );
+     if (ret == DFB_OK)
+          ret = sh_du_add_layer( dfb_layer_screen( layer ), driver_data,
+	                         lyr->id, lyr->plane.id, &lyr->level );
+
+     return ret;
 }
 
 static DFBResult
@@ -556,6 +572,8 @@ sh_du_set_region( CoreLayer                  *layer,
      SHDuLayerData   *lyr;
      u32             *pal, dirty;
 
+     D_DEBUG_AT( SH_DU_LAYER, "%s( %u, 0x%x )\n",
+                 __FUNCTION__, dfb_layer_id( layer ), updated );
      D_UNUSED_P( region_data );
      D_UNUSED_P( surface );
      D_UNUSED_P( right_lock );
@@ -721,9 +739,9 @@ sh_du_set_region( CoreLayer                  *layer,
 
           if (D_FLAGS_IS_SET( mode, SH_DU_PMR_BLEND )) {
 	       if (D_FLAGS_IS_SET( opacity, SH_DU_PALPHAR_PALETTE ))
-	            opacity |= SH_DU_PALPHAR_MASK; /* pixel alpha blending */
+	            opacity |= SH_DU_MASK_PALPHAR; /* pixel alpha blending */
 	       else /* const alpha blending */
-	            opacity = (opacity & ~SH_DU_PALPHAR_MASK) |
+	            opacity = (opacity & ~SH_DU_MASK_PALPHAR) |
                               (u32)lyr->opacity;
           }
           if (lyr->plane.opacity != opacity) {
@@ -765,12 +783,6 @@ sh_du_set_region( CoreLayer                  *layer,
      if (pal)
           free( pal );
 
-     ret = sh_du_add_layer( dfb_layer_screen( layer ),
-                            driver_data,
-                            lyr->id,
-                            (u8)lyr->plane.id,
-                            SH_DU_LEVEL_TO_PRIORITY( lyr->level ) );
-
      return ret;
 }
 
@@ -782,13 +794,14 @@ sh_du_remove_region( CoreLayer *layer,
 {
      SHDuLayerData *lyr;
 
+     D_DEBUG_AT( SH_DU_LAYER, "%s( %u )\n",
+                 __FUNCTION__, dfb_layer_id( layer ) );
      D_UNUSED_P( region_data );
 
      lyr = (SHDuLayerData *)layer_data;
 
      return sh_du_remove_layer( dfb_layer_screen( layer ),
-                                driver_data,
-                                lyr->id );
+                                driver_data, lyr->id );
 }
 
 static DFBResult
@@ -805,6 +818,11 @@ sh_du_flip_region( CoreLayer             *layer,
      SHGfxDriverData *drv;
      SHDuLayerData   *lyr;
  
+     D_DEBUG_AT( SH_DU_LAYER, "%s( %u, 0x%x )\n",
+                 __FUNCTION__, dfb_layer_id( layer ), flags );
+     D_UNUSED_P( region_data );
+     D_UNUSED_P( right_lock );
+
      ret = DFB_OK;
      drv = (SHGfxDriverData *)driver_data;
      lyr = (SHDuLayerData *)layer_data;
@@ -838,6 +856,8 @@ sh_du_update_region( CoreLayer             *layer,
                      const DFBRegion       *right_update,
                      CoreSurfaceBufferLock *right_lock )
 {
+     D_DEBUG_AT( SH_DU_LAYER, "%s( %u )\n",
+                 __FUNCTION__, dfb_layer_id( layer ) );
      D_UNUSED_P( layer );
      D_UNUSED_P( driver_data );
      D_UNUSED_P( layer_data );

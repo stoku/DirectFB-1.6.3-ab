@@ -9,7 +9,7 @@ prefix		:= @prefix@
 KERNELDIR	?= /lib/modules/$(shell uname -r)/build
 PWD		:= $(shell pwd)
 KERNELRELEASE	:= $(shell cat $(KERNELDIR)/include/config/kernel.release)
-MODINSTDIR	:= $(prefix)/lib/modules/$(KERNELRELEASE)/extra
+MODINSTDIR	:= $(DESTDIR)$(prefix)/lib/modules/$(KERNELRELEASE)/extra
 
 all:
 	$(MAKE) -C $(KERNELDIR) M=$(PWD) modules

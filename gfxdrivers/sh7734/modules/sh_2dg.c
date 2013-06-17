@@ -14,7 +14,9 @@
  */
 
 #include <linux/kernel.h>
+#include <linux/module.h>
 #include <linux/interrupt.h>
+#include <linux/clk.h>
 #include <linux/semaphore.h>
 #include <linux/delay.h>
 #include <linux/slab.h>
@@ -53,6 +55,7 @@ struct sh_2dg_miscdevice {
 		u8		*base;
 		resource_size_t	size;
 	} reg;
+	struct clk		*clk;
 	struct {
 		u32		*va[2]; /* virtual address */
 		u32		pa[2];  /* physical address */
@@ -63,7 +66,7 @@ struct sh_2dg_miscdevice {
 		unsigned int    order;
 	} cb; /* command buffer */
 	struct semaphore	sem;
-	struct miscdevice	mdev;
+	struct miscdevice	misc;
 };
 
 static struct sh_2dg_miscdevice *sh_2dg_create(void)
@@ -104,7 +107,7 @@ static void sh_2dg_delete(struct sh_2dg_miscdevice *dev)
 static struct sh_2dg_miscdevice *sh_2dg_get(struct file *filp)
 {
 	struct miscdevice *d = filp->private_data;
-	return (!d) ? NULL : container_of(d, struct sh_2dg_miscdevice, mdev);
+	return (!d) ? NULL : container_of(d, struct sh_2dg_miscdevice, misc);
 }
 
 static int sh_2dg_exec(struct sh_2dg_miscdevice *dev)
@@ -305,7 +308,7 @@ static int sh_2dg_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	shdev->reg.size = resource_size(res);
-	shdev->reg.base = (u8 *)ioremap(res->start, shdev->reg.size);
+	shdev->reg.base = (u8 *)ioremap_nocache(res->start, shdev->reg.size);
 
 	if (!shdev->reg.base) {
 		dev_err(&pdev->dev, "ioremap failed\n");
@@ -314,11 +317,11 @@ static int sh_2dg_probe(struct platform_device *pdev)
 	}
 
 	if (pdev->id < 0)
-		snprintf("%s", sizeof(shdev->name) - 1,
-			shdev->name, pdev->name);
+		snprintf(shdev->name, sizeof(shdev->name) - 1,
+			"%s", pdev->name);
 	else
-		snprintf("%s%d", sizeof(shdev->name) - 1,
-			shdev->name, pdev->name, pdev->id);
+		snprintf(shdev->name, sizeof(shdev->name) - 1,
+			"%s%d", pdev->name, pdev->id);
 
 	sema_init(&shdev->sem, 1);
 	shdev->irq = platform_get_irq(pdev, 0);
@@ -328,20 +331,37 @@ static int sh_2dg_probe(struct platform_device *pdev)
 		goto err_unmap;
 	}
 
-	shdev->mdev.name = shdev->name;
-	shdev->mdev.minor = MISC_DYNAMIC_MINOR;
-	shdev->mdev.fops = &sh_2dg_fops;
+	shdev->misc.name = shdev->name;
+	shdev->misc.minor = MISC_DYNAMIC_MINOR;
+	shdev->misc.fops = &sh_2dg_fops;
 
-	ret = misc_register(&shdev->mdev);
+	ret = misc_register(&shdev->misc);
 	if (ret) {
-		pr_err("sh_2dg: misc_register failed\n");
+		dev_err(&pdev->dev, "misc_register failed\n");
 		goto err_irq;
 	}
 
+        shdev->clk = clk_get(&pdev->dev, "2dg");
+	if (IS_ERR(shdev->clk)) {
+		dev_err(&pdev->dev, "clk_get failed\n");
+		ret = PTR_ERR(shdev->clk);
+		goto err_misc;
+	}
+	ret = clk_enable(shdev->clk);
+	if (ret) {
+		dev_err(&pdev->dev, "clk_enable failed\n");
+		goto err_clk;
+	}
+
 	platform_set_drvdata(pdev, shdev);
+	dev_info(&pdev->dev, "misc device registered\n");
 
 	return ret;
 
+err_clk:
+	clk_put(shdev->clk);
+err_misc:
+	misc_deregister(&shdev->misc);
 err_irq:
 	free_irq(shdev->irq, shdev);
 err_unmap:
@@ -358,7 +378,9 @@ static int sh_2dg_remove(struct platform_device *pdev)
 	shdev = (struct sh_2dg_miscdevice *)platform_get_drvdata(pdev);
 
 	platform_set_drvdata(pdev, NULL);
-	misc_deregister(&shdev->mdev);
+	misc_deregister(&shdev->misc);
+	clk_disable(shdev->clk);
+	clk_put(shdev->clk);
 	free_irq(shdev->irq, shdev);
 	iounmap(shdev->reg.base);
 	sh_2dg_delete(shdev);
@@ -385,11 +407,18 @@ static struct resource sh_2dg_resources[] = {
 	},
 };
 
+static void sh_2dg_device_release(struct device *dev)
+{
+}
+
 static struct platform_device sh_2dg_device = {
 	.name		= "sh_2dg",
 	.id		= -1,
 	.resource	= sh_2dg_resources,
 	.num_resources	= ARRAY_SIZE(sh_2dg_resources),
+	.dev = {
+		.release = sh_2dg_device_release,
+	},
 };
 
 static int __init sh_2dg_driver_init(void)
@@ -416,4 +445,8 @@ static void __exit sh_2dg_driver_exit(void)
 }
 
 module_exit(sh_2dg_driver_exit);
+
+MODULE_DESCRIPTION("Renesas 2DG driver");
+MODULE_AUTHOR("Sosuke Tokunaga");
+MODULE_LICENSE("GPL");
 

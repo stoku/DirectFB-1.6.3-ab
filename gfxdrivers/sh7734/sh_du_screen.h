@@ -26,16 +26,16 @@ DFBResult sh_du_add_layer( CoreScreen *screen,
                            void *driver_data,
                            DFBDisplayLayerID  id,
                            u8 plane,
-                           u8 priority );
+                           int *level);
 
 DFBResult sh_du_remove_layer( CoreScreen *screen,
                               void *driver_data,
                               DFBDisplayLayerID id );
 
-DFBResult sh_du_change_layer_priority( CoreScreen *screen,
-                                       void *driver_data,
-                                       DFBDisplayLayerID id,
-                                       u8 priority );
+DFBResult sh_du_change_layer_level( CoreScreen *screen,
+                                    void *driver_data,
+                                    DFBDisplayLayerID id,
+                                    int level );
 
 #endif /* __SH_DU_SCREEN_H__ */
 
