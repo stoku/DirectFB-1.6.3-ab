@@ -195,9 +195,35 @@ static long sh_du_ioctl(struct file *filp,
 	}
 }
 
+static ssize_t sh_du_read(struct file *filp,
+				char __user *buf,
+				size_t count,
+				loff_t *f_pos)
+{
+	struct sh_du_miscdevice *shdev;
+	loff_t pos;
+
+	shdev = sh_du_get(filp);
+	if (!shdev)
+		return -ENODEV;
+
+	pos = *f_pos;
+	if (pos >= shdev->reg.size)
+		return 0;
+
+	if (count > (shdev->reg.size - (size_t)pos))
+		count = shdev->reg.size - (size_t)pos;
+
+	count -= copy_to_user(buf, shdev->reg.base + pos, count);
+	*f_pos = pos + count;
+
+	return count;
+}
+
 static struct file_operations sh_du_fops = {
 	.open		= sh_du_open,
 	.unlocked_ioctl	= sh_du_ioctl,
+	.read		= sh_du_read,
 };
 
 static int sh_du_probe(struct platform_device *pdev)

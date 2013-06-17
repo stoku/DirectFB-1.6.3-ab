@@ -164,6 +164,8 @@
 #define SH_2DG_CLRWC(mode)	(0xE0000020 | ((mode) & 0x3000))
 #define SH_2DG_BITBLTA(mode)	(0xA2000000 | ((mode) & 0x3FFF))
 #define SH_2DG_BITBLTC(mode)	(0xA0000000 | ((mode) & 0x361E))
+#define SH_2DG_MOVE		(0x48000000)
+#define SH_2DG_LCOFS		(0x40000000)
 
 #define SH_2DG_SYNC_WCLR	(0x01 << 9)
 #define SH_2DG_SYNC_WFLSH	(0x01 << 8)

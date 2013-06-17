@@ -181,10 +181,6 @@ init_layer( const SHGfxDriverData *drv,
      reg.offset = SH_DU_PWASPR( layer->plane.id );
      reg.value  = 0;
      (void)SH_DU_WRITE( drv->dpy_fd, reg );
-
-     reg.offset = SH_DU_PWAMPR( layer->plane.id );
-     reg.value  = 4095; /* max value */
-     (void)SH_DU_WRITE( drv->dpy_fd, reg );
 }
 
 static DFBResult
@@ -285,6 +281,12 @@ update_layer( const SHGfxDriverData *drv,
           SH_DU_CHECK_REG_VALUE( PDSYR, reg.value );
           if (SH_DU_WRITE( fd, reg ))
                goto err_reset;
+          reg.offset = SH_DU_PMLR( i );
+          if (SH_DU_WRITE( fd, reg ))
+               goto err_reset;
+          reg.offset = SH_DU_PWAMWR( i );
+          if (SH_DU_WRITE( fd, reg ))
+               goto err_reset;
      }
      if (SH_DU_PLANE_IS_DIRTY( dirty, OPACITY )) {
           reg.offset = SH_DU_PALPHAR( i );
@@ -354,7 +356,7 @@ sh_du_init_layer( CoreLayer                  *layer,
                   DFBDisplayLayerConfig      *config,
                   DFBColorAdjustment         *adjustment )
 {
-     DFBResult          ret;
+     DFBResult        ret;
 
      D_DEBUG_AT( SH_DU_LAYER, "%s()\n", __FUNCTION__ );
      D_UNUSED_P( driver_data );
@@ -377,7 +379,7 @@ sh_du_init_layer( CoreLayer                  *layer,
                            DLCONF_BUFFERMODE |
                            DLCONF_OPTIONS;
 
-     description->type         = DLTF_GRAPHICS | DLTF_STILL_PICTURE;
+     description->type         = DLTF_GRAPHICS;
      description->caps         = DLCAPS_SURFACE |
                                  DLCAPS_OPACITY |
                                  DLCAPS_ALPHACHANNEL |
@@ -614,6 +616,8 @@ sh_du_set_region( CoreLayer                  *layer,
                lyr->plane.pa0 = left_lock->phys;
                SH_DU_PLANE_SET_DIRTY( dirty, PA0 );
           }
+          D_INFO( "SH-DU/Layer %d: set surface 0x%08x (stride = %d)\n",
+                  lyr->id, lyr->plane.pa0, lyr->plane.stride );
      }
 
      /* area */
@@ -739,9 +743,10 @@ sh_du_set_region( CoreLayer                  *layer,
 
           if (D_FLAGS_IS_SET( mode, SH_DU_PMR_BLEND )) {
 	       if (D_FLAGS_IS_SET( opacity, SH_DU_PALPHAR_PALETTE ))
-	            opacity |= SH_DU_MASK_PALPHAR; /* pixel alpha blending */
+                    /* pixel alpha blending */
+	            opacity |= SH_DU_PALPHAR_ALPHA_MASK;
 	       else /* const alpha blending */
-	            opacity = (opacity & ~SH_DU_MASK_PALPHAR) |
+	            opacity = (opacity & ~SH_DU_PALPHAR_ALPHA_MASK) |
                               (u32)lyr->opacity;
           }
           if (lyr->plane.opacity != opacity) {
@@ -835,11 +840,21 @@ sh_du_flip_region( CoreLayer             *layer,
 
      lyr->plane.pa0 = left_lock->phys;
      ret = update_layer( drv, lyr, PLANE_PA0, NULL );
+     if (ret)
+          goto out;
+
+     D_INFO( "SH-DU/Layer %d: flip surface 0x%08x (stride = %d)\n",
+             lyr->id, lyr->plane.pa0, lyr->plane.stride );
 
      if (D_FLAGS_IS_SET( flags, DSFLIP_WAIT ))
           ret = dfb_layer_wait_vsync( layer );
 
      dfb_surface_flip( surface, false );
+
+     if (ret)
+          goto out;
+
+     ret = sh_du_show_layer( dfb_layer_screen( layer ), driver_data, lyr->id );
 
 out:
      return ret;

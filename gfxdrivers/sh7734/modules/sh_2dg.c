@@ -35,6 +35,7 @@
 #define SH_2DG_SRCR		(0x0008)
 #define SH_2DG_ICIDR		(0x0010)
 #define SH_2DG_DLSAR		(0x0048)
+#define SH_2DG_CSTR		(0x00C4)
 
 #define SH_2DG_SCLR_SRES	(0x01 << 31)
 #define SH_2DG_SCLR_HRES	(0x01 << 30)
@@ -57,16 +58,18 @@ struct sh_2dg_miscdevice {
 	} reg;
 	struct clk		*clk;
 	struct {
-		u32		*va[2]; /* virtual address */
-		u32		pa[2];  /* physical address */
-		unsigned int	index;  /* current index */
-		size_t		size;   /* buffer size */
-		size_t		filled; /* filled size */
+		u32		*va[2];  /* virtual address */
+		u32		pa[2];   /* physical address */
+		unsigned int	index;   /* current index */
+		size_t		size;    /* buffer size */
+		size_t		filled;  /* filled size */
+		unsigned int    flushed; /* flushed count */
 		struct page	*page;
 		unsigned int    order;
 	} cb; /* command buffer */
 	struct semaphore	sem;
 	struct miscdevice	misc;
+	struct device		*dev;
 };
 
 static struct sh_2dg_miscdevice *sh_2dg_create(void)
@@ -115,16 +118,32 @@ static int sh_2dg_exec(struct sh_2dg_miscdevice *dev)
 	int ret;
 
 	dev->cb.va[dev->cb.index][dev->cb.filled] = SH_2DG_CMD_TRAP;
-	wmb();
 	ret = down_interruptible(&dev->sem);
 	if (ret)
 		goto out;
 
-	dev->status &= ~(SH_2DG_SR_INT | SH_2DG_SR_TRA);
+	if (dev->status & SH_2DG_SR_CER) {
+		u32 cst, i, j, k;
+		cst = ioread32(dev->reg.base + SH_2DG_CSTR);
+		i   = 0;
+		j   = (cst < dev->cb.pa[1]) ? 0 : 1;
+		k   = (cst - dev->cb.pa[i]) / sizeof(u32);
+		dev_err( dev->dev, "CER detected at 0x%08x\n", cst );
+		while (i < dev->cb.size) {
+			pr_err( "\t%03x: 0x%08x%s\n",
+				dev->cb.va[j][i],
+				(i == k) ? " <- here" : "");
+			if (dev->cb.va[j][i] == SH_2DG_CMD_TRAP)
+				break;
+		}
+		ret = -EIO;
+	}
+	dev->status &= ~(SH_2DG_SR_CER | SH_2DG_SR_INT | SH_2DG_SR_TRA);
 	iowrite32(dev->cb.pa[dev->cb.index], dev->reg.base + SH_2DG_DLSAR);
 	iowrite32(SH_2DG_SCLR_RS, dev->reg.base + SH_2DG_SCLR);
 	dev->cb.index ^= 1;
 	dev->cb.filled = 0;
+	dev->cb.flushed++;
 out:
 	return ret;
 }
@@ -199,12 +218,38 @@ static int sh_2dg_release(struct inode *inode, struct file *filp)
 	return 0;
 }
 
+static ssize_t sh_2dg_read(struct file *filp,
+				char __user *buf,
+				size_t count,
+				loff_t *f_pos)
+{
+	struct sh_2dg_miscdevice *shdev;
+	loff_t pos;
+
+	shdev = sh_2dg_get(filp);
+	if (!shdev)
+		return -ENODEV;
+
+	pos = *f_pos;
+	if (pos >= shdev->reg.size)
+		return 0;
+
+	if (count > (shdev->reg.size - (size_t)pos))
+		count = shdev->reg.size - (size_t)pos;
+
+	count -= copy_to_user(buf, shdev->reg.base + pos, count);
+	*f_pos = pos + count;
+
+	return count;
+}
+
 static ssize_t sh_2dg_write(struct file *filp,
 				const char __user *buf,
 				size_t count,
 				loff_t *f_pos)
 {
 	struct sh_2dg_miscdevice *shdev;
+	u32 *dst;
 	size_t n;
 
 	shdev = sh_2dg_get(filp);
@@ -224,11 +269,8 @@ static ssize_t sh_2dg_write(struct file *filp,
 			return (ssize_t)rc;
 	}
 
-	if (shdev->status & SH_2DG_SR_CER)
-		return -EIO;
-
-	copy_from_user(shdev->cb.va[shdev->cb.index] + shdev->cb.filled,
-			buf, count);
+	dst = shdev->cb.va[shdev->cb.index];
+	count -= copy_from_user(dst + shdev->cb.filled, buf, count);
 	shdev->cb.filled += n;
 
 	return (ssize_t)count;
@@ -259,7 +301,7 @@ static int sh_2dg_fsync(struct file *filp,
 		up(&shdev->sem);
 	}
 
-	return (shdev->status & SH_2DG_SR_CER) ? -EIO : 0;
+	return 0;
 }
 
 static long sh_2dg_ioctl(struct file *filp,
@@ -286,6 +328,7 @@ static long sh_2dg_ioctl(struct file *filp,
 static struct file_operations sh_2dg_fops = {
 	.open		= sh_2dg_open,
 	.release	= sh_2dg_release,
+	.read		= sh_2dg_read,
 	.write		= sh_2dg_write,
 	.fsync		= sh_2dg_fsync,
 	.unlocked_ioctl	= sh_2dg_ioctl,
@@ -353,6 +396,7 @@ static int sh_2dg_probe(struct platform_device *pdev)
 		goto err_clk;
 	}
 
+	shdev->dev = &pdev->dev;
 	platform_set_drvdata(pdev, shdev);
 	dev_info(&pdev->dev, "misc device registered\n");
 

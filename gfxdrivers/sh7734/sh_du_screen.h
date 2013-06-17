@@ -32,6 +32,10 @@ DFBResult sh_du_remove_layer( CoreScreen *screen,
                               void *driver_data,
                               DFBDisplayLayerID id );
 
+DFBResult sh_du_show_layer( CoreScreen *screen,
+                            void *driver_data,
+                            DFBDisplayLayerID id );
+
 DFBResult sh_du_change_layer_level( CoreScreen *screen,
                                     void *driver_data,
                                     DFBDisplayLayerID id,

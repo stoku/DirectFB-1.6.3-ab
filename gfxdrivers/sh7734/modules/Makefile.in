@@ -18,7 +18,8 @@ clean:
 	$(MAKE) -C $(KERNELDIR) M=$(PWD) clean
 
 install:
-	$(MAKE) INSTALL_MOD_PATH=$(prefix) -C $(KERNELDIR) M=$(PWD) modules_install
+	$(MAKE) INSTALL_MOD_PATH=$(DESTDIR)$(prefix) \
+		-C $(KERNELDIR) M=$(PWD) modules_install
 	@rm -f .installed
 	@for mod in $(wildcard *.ko); do \
 		echo $(MODINSTDIR)/$${mod} >> .installed; \

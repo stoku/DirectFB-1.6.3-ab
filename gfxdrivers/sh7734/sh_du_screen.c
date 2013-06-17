@@ -115,7 +115,8 @@ update_layers( const SHGfxDriverData *drv,
      reg.value  = 0u;
      for (i = 0; i < 8; i++)
           reg.value |= (u32)(screen->layer.values[i] & 0x0F) << (4 * i);
-     
+     D_INFO( "SH-DU/Screen: DPPR = 0x%08x\n", reg.value );
+
      return SH_DU_WRITE( drv->dpy_fd, reg );
 }
 
@@ -712,6 +713,33 @@ sh_du_remove_layer( CoreScreen *screen,
 }
 
 DFBResult
+sh_du_show_layer( CoreScreen *screen,
+                  void *driver_data,
+                  DFBDisplayLayerID id )
+{
+     SHGfxDriverData *drv;
+     SHDuScreenData  *scr;
+     u8 pri;
+
+     D_ASSERT( id < SH_GFX_NUM_LAYERS );
+
+     drv = (SHGfxDriverData *)driver_data;
+     scr = (SHDuScreenData *)screen->screen_data;
+     pri = scr->layer.priorities[id];
+
+     if (!SH_DU_LAYER_PRIORITY_IS_VALID( pri ))
+          return DFB_INVARG;
+
+     if (D_FLAGS_IS_SET( scr->layer.values[pri], SH_DU_LAYER_VISIBLE ))
+          return DFB_OK;
+
+     D_ASSERT( SH_DU_LAYER_VALUE_IS_VALID( scr->layer.values[pri] ) );
+     scr->layer.values[pri] |= SH_DU_LAYER_VISIBLE;
+
+     return update_layers( drv, scr ) ? DFB_IO : DFB_OK;
+}
+
+DFBResult
 sh_du_change_layer_level( CoreScreen *screen,
                           void *driver_data,
                           DFBDisplayLayerID id,
@@ -739,9 +767,9 @@ sh_du_change_layer_level( CoreScreen *screen,
      if (SH_DU_LAYER_VALUE_IS_VALID( scr->layer.values[pri] ))
           return DFB_BUSY;
 
-     scr->layer.values[pri]    = scr->layer.values[current];
+     scr->layer.values[pri]     = scr->layer.values[current];
      scr->layer.values[current] = SH_DU_LAYER_INVALID_VALUE;
-     scr->layer.priorities[id] = pri;
+     scr->layer.priorities[id]  = pri;
 
      return update_layers( drv, scr ) ? DFB_IO : DFB_OK;
 }
