@@ -1481,8 +1481,13 @@ dfb_core_shutdown( CoreDFB *core, bool emergency )
      dfb_core_part_shutdown( core, &dfb_layer_core, emergency );
      dfb_core_part_shutdown( core, &dfb_screen_core, emergency );
 
-     /* Destroy surface and palette objects. */
+     /* Destroy graphics state objects. */
      fusion_object_pool_destroy( shared->graphics_state_pool, core->world );
+
+     /* Shutdown graphics core. */
+     dfb_core_part_shutdown( core, &dfb_graphics_core, emergency );
+
+     /* Destroy surface and palette objects. */
      fusion_object_pool_destroy( shared->surface_client_pool, core->world );
      fusion_object_pool_destroy( shared->surface_pool, core->world );
      fusion_object_pool_destroy( shared->surface_buffer_pool, core->world );
@@ -1490,7 +1495,6 @@ dfb_core_shutdown( CoreDFB *core, bool emergency )
      fusion_object_pool_destroy( shared->palette_pool, core->world );
 
      /* Destroy remaining core parts. */
-     dfb_core_part_shutdown( core, &dfb_graphics_core, emergency );
      dfb_core_part_shutdown( core, &dfb_surface_core, emergency );
      dfb_core_part_shutdown( core, &dfb_input_core, emergency );
      dfb_core_part_shutdown( core, &dfb_system_core, emergency );
