@@ -94,7 +94,8 @@ am__uninstall_files_from_dir = { \
     || { echo " ( cd '$$dir' && rm -f" $$files ")"; \
          $(am__cd) "$$dir" && rm -f $$files; }; \
   }
-am__installdirs = "$(DESTDIR)$(sh7734dir)" "$(DESTDIR)$(sh7734dir)"
+am__installdirs = "$(DESTDIR)$(sh7734dir)" "$(DESTDIR)$(sh7734dir)" \
+	"$(DESTDIR)$(sh7734confdir)"
 LTLIBRARIES = $(sh7734_LTLIBRARIES)
 libdirectfb_sh7734_la_DEPENDENCIES =  \
 	$(top_builddir)/lib/direct/libdirect.la \
@@ -149,7 +150,7 @@ am__can_run_installinfo = \
     n|no|NO) false;; \
     *) (install-info --version) >/dev/null 2>&1;; \
   esac
-DATA = $(sh7734_DATA)
+DATA = $(sh7734_DATA) $(sh7734conf_DATA)
 RECURSIVE_CLEAN_TARGETS = mostlyclean-recursive clean-recursive	\
   distclean-recursive maintainer-clean-recursive
 AM_RECURSIVE_TARGETS = $(RECURSIVE_TARGETS:-recursive=) \
@@ -418,7 +419,7 @@ top_srcdir = @top_srcdir@
 SUBDIRS = modules
 EXTRA_DIST = \
 	README.sh7734		\
-	directfbrc.sh7734	\
+	directfbrc		\
 	modules/Makefile.in	\
 	modules/sh_2dg.c	\
 	modules/sh_2dg.h	\
@@ -457,6 +458,8 @@ libdirectfb_sh7734_la_LIBADD = \
 	$(top_builddir)/lib/direct/libdirect.la	\
 	$(top_builddir)/src/libdirectfb.la
 
+sh7734confdir = $(SYSCONFDIR)
+sh7734conf_DATA = directfbrc
 all: all-recursive
 
 .SUFFIXES:
@@ -585,6 +588,27 @@ uninstall-sh7734DATA:
 	@list='$(sh7734_DATA)'; test -n "$(sh7734dir)" || list=; \
 	files=`for p in $$list; do echo $$p; done | sed -e 's|^.*/||'`; \
 	dir='$(DESTDIR)$(sh7734dir)'; $(am__uninstall_files_from_dir)
+install-sh7734confDATA: $(sh7734conf_DATA)
+	@$(NORMAL_INSTALL)
+	@list='$(sh7734conf_DATA)'; test -n "$(sh7734confdir)" || list=; \
+	if test -n "$$list"; then \
+	  echo " $(MKDIR_P) '$(DESTDIR)$(sh7734confdir)'"; \
+	  $(MKDIR_P) "$(DESTDIR)$(sh7734confdir)" || exit 1; \
+	fi; \
+	for p in $$list; do \
+	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
+	  echo "$$d$$p"; \
+	done | $(am__base_list) | \
+	while read files; do \
+	  echo " $(INSTALL_DATA) $$files '$(DESTDIR)$(sh7734confdir)'"; \
+	  $(INSTALL_DATA) $$files "$(DESTDIR)$(sh7734confdir)" || exit $$?; \
+	done
+
+uninstall-sh7734confDATA:
+	@$(NORMAL_UNINSTALL)
+	@list='$(sh7734conf_DATA)'; test -n "$(sh7734confdir)" || list=; \
+	files=`for p in $$list; do echo $$p; done | sed -e 's|^.*/||'`; \
+	dir='$(DESTDIR)$(sh7734confdir)'; $(am__uninstall_files_from_dir)
 
 # This directory's subdirectories are mostly independent; you can cd
 # into them and run `make' without going through this Makefile.
@@ -781,7 +805,7 @@ check: check-recursive
 all-am: Makefile $(LTLIBRARIES) $(DATA)
 installdirs: installdirs-recursive
 installdirs-am:
-	for dir in "$(DESTDIR)$(sh7734dir)" "$(DESTDIR)$(sh7734dir)"; do \
+	for dir in "$(DESTDIR)$(sh7734dir)" "$(DESTDIR)$(sh7734dir)" "$(DESTDIR)$(sh7734confdir)"; do \
 	  test -z "$$dir" || $(MKDIR_P) "$$dir"; \
 	done
 install: install-recursive
@@ -837,7 +861,8 @@ info: info-recursive
 
 info-am:
 
-install-data-am: install-sh7734DATA install-sh7734LTLIBRARIES
+install-data-am: install-sh7734DATA install-sh7734LTLIBRARIES \
+	install-sh7734confDATA
 
 install-dvi: install-dvi-recursive
 
@@ -883,7 +908,8 @@ ps: ps-recursive
 
 ps-am:
 
-uninstall-am: uninstall-sh7734DATA uninstall-sh7734LTLIBRARIES
+uninstall-am: uninstall-sh7734DATA uninstall-sh7734LTLIBRARIES \
+	uninstall-sh7734confDATA
 
 .MAKE: $(RECURSIVE_CLEAN_TARGETS) $(RECURSIVE_TARGETS) ctags-recursive \
 	install-am install-strip tags-recursive
@@ -897,12 +923,14 @@ uninstall-am: uninstall-sh7734DATA uninstall-sh7734LTLIBRARIES
 	install-dvi-am install-exec install-exec-am install-html \
 	install-html-am install-info install-info-am install-man \
 	install-pdf install-pdf-am install-ps install-ps-am \
-	install-sh7734DATA install-sh7734LTLIBRARIES install-strip \
-	installcheck installcheck-am installdirs installdirs-am \
-	maintainer-clean maintainer-clean-generic mostlyclean \
-	mostlyclean-compile mostlyclean-generic mostlyclean-libtool \
-	pdf pdf-am ps ps-am tags tags-recursive uninstall uninstall-am \
-	uninstall-sh7734DATA uninstall-sh7734LTLIBRARIES
+	install-sh7734DATA install-sh7734LTLIBRARIES \
+	install-sh7734confDATA install-strip installcheck \
+	installcheck-am installdirs installdirs-am maintainer-clean \
+	maintainer-clean-generic mostlyclean mostlyclean-compile \
+	mostlyclean-generic mostlyclean-libtool pdf pdf-am ps ps-am \
+	tags tags-recursive uninstall uninstall-am \
+	uninstall-sh7734DATA uninstall-sh7734LTLIBRARIES \
+	uninstall-sh7734confDATA
 
 %.o: .libs/%.a %.la
 	rm -f $<.tmp/*.o

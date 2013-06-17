@@ -4,7 +4,7 @@ SUBDIRS = modules
 
 EXTRA_DIST = \
 	README.sh7734		\
-	directfbrc.sh7734	\
+	directfbrc		\
 	modules/Makefile.in	\
 	modules/sh_2dg.c	\
 	modules/sh_2dg.h	\
@@ -47,5 +47,8 @@ libdirectfb_sh7734_la_LDFLAGS = \
 libdirectfb_sh7734_la_LIBADD = \
 	$(top_builddir)/lib/direct/libdirect.la	\
 	$(top_builddir)/src/libdirectfb.la
+
+sh7734confdir = $(SYSCONFDIR)
+sh7734conf_DATA = directfbrc
 
 include $(top_srcdir)/rules/libobject.make
