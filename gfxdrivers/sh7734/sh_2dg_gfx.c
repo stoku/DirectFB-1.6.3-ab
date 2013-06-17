@@ -84,6 +84,8 @@ typedef struct {
      CoreSurface           *work_surface;
      CoreSurfaceBufferLock  work_lock;
      DFBDimension           work_size;
+     bool                   cmds_written;
+     bool                   cmds_flushed;
 } SH2dgDeviceData;
 
 typedef struct {
@@ -94,9 +96,13 @@ typedef struct {
 } SH2dgBuffer;
 
 static int
-write_cmds( int fd, const u32 *cmds, size_t count)
+write_cmds( SHGfxDriverData *drv,
+            SH2dgDeviceData *dev,
+            const u32 *cmds,
+            size_t count)
 {
-     return write( fd, cmds, count * sizeof(u32) );
+     dev->cmds_written = true;
+     return write( drv->gfx_fd, cmds, count * sizeof(u32) );
 }
 
 static int reset_regs( SHGfxDriverData *drv,
@@ -218,7 +224,7 @@ static int reset_regs( SHGfxDriverData *drv,
      cmds[5] = SH_2DG_REG(2, SH_2DG_RUCLMIR);
      cmds[6] = 0;
      cmds[7] = 0;
-     ret = write_cmds( drv->gfx_fd, cmds, D_ARRAY_SIZE(cmds) );
+     ret = write_cmds( drv, dev, cmds, D_ARRAY_SIZE(cmds) );
 
 out:
      return ret;
@@ -351,7 +357,7 @@ set_destination( SHGfxDriverData *drv,
      else
           D_FLAGS_CLEAR(dev->rctl, SH_2DG_RCLR_DPF);
 
-     return (i > 0) ? write_cmds( drv->gfx_fd, cmds, i ) : 0;
+     return (i > 0) ? write_cmds( drv, dev, cmds, i ) : 0;
 }
 
 static int
@@ -381,7 +387,7 @@ set_source( SHGfxDriverData *drv,
      else
           D_FLAGS_CLEAR(dev->rctl, SH_2DG_RCLR_SPF);
 
-     return (i > 0) ? write_cmds( drv->gfx_fd, cmds, i ) : 0;
+     return (i > 0) ? write_cmds( drv, dev, cmds, i ) : 0;
 }
 
 static int
@@ -403,7 +409,7 @@ set_clip( SHGfxDriverData *drv,
           dev->reg.uclmi = uclmi;
           dev->reg.uclma = uclma;
 
-          return write_cmds( drv->gfx_fd, cmds, D_ARRAY_SIZE( cmds ) );
+          return write_cmds( drv, dev, cmds, D_ARRAY_SIZE( cmds ) );
      }
      return 0;
 }
@@ -420,7 +426,7 @@ set_alpha( SHGfxDriverData *drv, SH2dgDeviceData *dev )
           cmds[2]       = alph;
           dev->reg.alph = alph;
 
-          return write_cmds( drv->gfx_fd, cmds, D_ARRAY_SIZE( cmds ) );
+          return write_cmds( drv, dev, cmds, D_ARRAY_SIZE( cmds ) );
      }
      return 0;
 }
@@ -436,7 +442,7 @@ set_dst_key( SHGfxDriverData *drv, SH2dgDeviceData *dev )
           cmds[2]      = dev->dst_key;
           dev->reg.dtc = dev->dst_key;
 
-          return write_cmds( drv->gfx_fd, cmds, D_ARRAY_SIZE( cmds ) );
+          return write_cmds( drv, dev, cmds, D_ARRAY_SIZE( cmds ) );
      }
      return 0;
 }
@@ -452,7 +458,7 @@ set_src_key( SHGfxDriverData *drv, SH2dgDeviceData *dev )
           cmds[2]      = dev->src_key;
           dev->reg.stc = dev->src_key;
 
-          return write_cmds( drv->gfx_fd, cmds, D_ARRAY_SIZE( cmds ) );
+          return write_cmds( drv, dev, cmds, D_ARRAY_SIZE( cmds ) );
      }
      return 0;
 }
@@ -468,7 +474,7 @@ set_rctl( SHGfxDriverData *drv, SH2dgDeviceData *dev )
           cmds[2]      = dev->rctl;
           dev->reg.rcl = dev->rctl;
 
-          return write_cmds( drv->gfx_fd, cmds, D_ARRAY_SIZE( cmds ) );
+          return write_cmds( drv, dev, cmds, D_ARRAY_SIZE( cmds ) );
      }
      return 0;
 }
@@ -564,12 +570,12 @@ clear_stencil( SHGfxDriverData *drv,
      cmds[1] = 0;
      cmds[2] = dev->reg.sclma;
 
-     return write_cmds( drv->gfx_fd, cmds, D_ARRAY_SIZE( cmds ) );
+     return write_cmds( drv, dev, cmds, D_ARRAY_SIZE( cmds ) );
 }
 
 static int
-fill_stencil( const SHGfxDriverData *drv,
-              const SH2dgDeviceData *dev,
+fill_stencil( SHGfxDriverData *drv,
+              SH2dgDeviceData *dev,
               u32 mode,
               const DFBRectangle *bounds,
               const DFBPoint points[4])
@@ -591,12 +597,12 @@ fill_stencil( const SHGfxDriverData *drv,
           cmds[4 + i] = SH_2DG_XY( points[i].x, points[i].y );
      cmds[4 + i] = SH_2DG_XY( points[0].x, points[0].y );
 
-     return write_cmds( drv->gfx_fd, cmds, n + 5 );
+     return write_cmds( drv, dev, cmds, n + 5 );
 }
 
 static int
-stroke_line( const SHGfxDriverData *drv,
-             const SH2dgDeviceData *dev,
+stroke_line( SHGfxDriverData *drv,
+             SH2dgDeviceData *dev,
              u32 mode,
              const DFBPoint points[2] )
 {
@@ -608,12 +614,12 @@ stroke_line( const SHGfxDriverData *drv,
      cmds[3] = SH_2DG_XY( points[0].x, points[0].y );
      cmds[4] = SH_2DG_XY( points[1].x, points[1].y );
 
-     return write_cmds( drv->gfx_fd, cmds, D_ARRAY_SIZE( cmds ) );
+     return write_cmds( drv, dev, cmds, D_ARRAY_SIZE( cmds ) );
 }
 
 static int
-stroke_quad( const SHGfxDriverData *drv,
-             const SH2dgDeviceData *dev,
+stroke_quad( SHGfxDriverData *drv,
+             SH2dgDeviceData *dev,
              u32 mode,
              const DFBPoint points[4] )
 {
@@ -627,12 +633,12 @@ stroke_quad( const SHGfxDriverData *drv,
          cmds[3 + i] = SH_2DG_XY( points[i].x, points[i].y );
      cmds[3 + i] = SH_2DG_XY( points[0].x, points[0].y );
 
-     return write_cmds( drv->gfx_fd, cmds, D_ARRAY_SIZE( cmds ) );
+     return write_cmds( drv, dev, cmds, D_ARRAY_SIZE( cmds ) );
 }
 
 static int
-fill_rect( const SHGfxDriverData *drv,
-           const SH2dgDeviceData *dev,
+fill_rect( SHGfxDriverData *drv,
+           SH2dgDeviceData *dev,
            u32 mode,
            const DFBRectangle *rect )
 {
@@ -648,12 +654,12 @@ fill_rect( const SHGfxDriverData *drv,
      cmds[4]  = rect->h - 1;
      cmds[5]  = SH_2DG_XY( rect->x, rect->y );
 
-     return write_cmds( drv->gfx_fd, cmds, D_ARRAY_SIZE( cmds ) );
+     return write_cmds( drv, dev, cmds, D_ARRAY_SIZE( cmds ) );
 }
 
 static int
-fill_quad( const SHGfxDriverData *drv,
-           const SH2dgDeviceData *dev,
+fill_quad( SHGfxDriverData *drv,
+           SH2dgDeviceData *dev,
            u32 mode,
            const DFBPoint points[4])
 {
@@ -665,12 +671,12 @@ fill_quad( const SHGfxDriverData *drv,
      for (i = 0; i < 4; i++)
           cmds[2 + i] = SH_2DG_XY( points[i].x, points[i].y );
 
-     return write_cmds( drv->gfx_fd, cmds, D_ARRAY_SIZE( cmds ) );
+     return write_cmds( drv, dev, cmds, D_ARRAY_SIZE( cmds ) );
 }
 
 static int
-copy_rect( const SHGfxDriverData *drv,
-           const SH2dgDeviceData *dev,
+copy_rect( SHGfxDriverData *drv,
+           SH2dgDeviceData *dev,
            u32 mode,
            const DFBRectangle *rect,
            int dx,
@@ -685,12 +691,12 @@ copy_rect( const SHGfxDriverData *drv,
      cmds[4] = rect->h - 1;
      cmds[5] = SH_2DG_XY( dx, dy );
 
-     return write_cmds( drv->gfx_fd, cmds, D_ARRAY_SIZE( cmds ) );
+     return write_cmds( drv, dev, cmds, D_ARRAY_SIZE( cmds ) );
 }
 
 static int
-copy_quad( const SHGfxDriverData *drv,
-           const SH2dgDeviceData *dev,
+copy_quad( SHGfxDriverData *drv,
+           SH2dgDeviceData *dev,
            u32 mode,
            const DFBRectangle *rect,
            const DFBPoint points[4] )
@@ -705,7 +711,7 @@ copy_quad( const SHGfxDriverData *drv,
      for (i = 0; i < 4; i++)
           cmds[4 + i] = SH_2DG_XY(points[i].x, points[i].y);
 
-     return write_cmds( drv->gfx_fd, cmds, D_ARRAY_SIZE( cmds ) );
+     return write_cmds( drv, dev, cmds, D_ARRAY_SIZE( cmds ) );
 }
 
 static void
@@ -798,31 +804,47 @@ static DFBResult
 sh_2dg_engine_sync( void *driver_data, void *device_data )
 {
      SHGfxDriverData *drv;
+     SH2dgDeviceData *dev;
+     DFBResult ret;
 
      D_DEBUG_AT( SH_2DG_GFX, "%s()\n", __FUNCTION__ );
      D_UNUSED_P( device_data );
 
      drv = (SHGfxDriverData *)driver_data;
+     dev = (SH2dgDeviceData *)device_data;
+     ret = DFB_OK;
 
-     return rc_to_result(fsync( drv->gfx_fd ));
+     if (dev->cmds_flushed) {
+          ret = rc_to_result( fsync( drv->gfx_fd ) );
+          dev->cmds_flushed = false;
+     }
+
+     return ret;
 }
 
 static void
 sh_2dg_emit_commands( void *driver_data, void *device_data )
 {
      SHGfxDriverData *drv;
-     u32 cmds[1];
+     SH2dgDeviceData *dev;
 
      D_DEBUG_AT( SH_2DG_GFX, "%s()\n", __FUNCTION__ );
-     D_UNUSED_P( device_data );
 
      drv = (SHGfxDriverData *)driver_data;
+     dev = (SH2dgDeviceData *)device_data;
 
-     cmds[0] = SH_2DG_SYNC( SH_2DG_SYNC_TCLR |
-                            SH_2DG_SYNC_DFLSH );
+     if (dev->cmds_written) {
+          u32 cmds[1];
 
-     if ( write_cmds( drv->gfx_fd, cmds, D_ARRAY_SIZE( cmds ) ) >= 0 )
-          (void)fdatasync( drv->gfx_fd );
+          cmds[0] = SH_2DG_SYNC( SH_2DG_SYNC_TCLR |
+                                 SH_2DG_SYNC_DFLSH );
+
+          if ( write_cmds( drv, dev, cmds, D_ARRAY_SIZE( cmds ) ) >= 0 ) {
+               (void)fdatasync( drv->gfx_fd );
+               dev->cmds_written = false;
+               dev->cmds_flushed = true;
+          }
+     }
 }
 
 static void
