@@ -1,15 +1,15 @@
 ## Makefile.am for DirectFB/gfxdrivers/sh7734
 
-SUBDIRS = modules
+SUBDIRS = kernel-module
 
 EXTRA_DIST = \
-	README.sh7734		\
-	directfbrc		\
-	modules/Makefile.in	\
-	modules/sh_2dg.c	\
-	modules/sh_2dg.h	\
-	modules/sh_du.c		\
-	modules/sh_du.h
+	README.sh7734			\
+	directfbrc			\
+	kernel-module/Makefile.in	\
+	kernel-module/sh_2dg.c		\
+	kernel-module/sh_2dg.h		\
+	kernel-module/sh_du.c		\
+	kernel-module/sh_du.h
 
 INCLUDES = \
 	-I$(top_builddir)/include	\
@@ -17,7 +17,8 @@ INCLUDES = \
 	-I$(top_srcdir)/include		\
 	-I$(top_srcdir)/lib		\
 	-I$(top_srcdir)/src		\
-	-I$(top_srcdir)/systems
+	-I$(top_srcdir)/systems		\
+	-I$(srcdir)/kernel-module
 
 sh7734_LTLIBRARIES = libdirectfb_sh7734.la
 

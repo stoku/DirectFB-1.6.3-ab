@@ -18,7 +18,7 @@
 #include <direct/debug.h>
 #include <fusion/call.h>
 #include <core/screens_internal.h>
-#include "modules/sh_du.h"
+#include <sh_du.h>
 #include "sh_gfx.h"
 #include "sh_du_screen.h"
 #include "sh_du_reg.h"

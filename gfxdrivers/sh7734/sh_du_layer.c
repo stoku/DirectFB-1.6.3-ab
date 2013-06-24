@@ -20,7 +20,7 @@
 #include <core/layer_control.h>
 #include <core/screen.h>
 #include <core/palette.h>
-#include "modules/sh_du.h"
+#include <sh_du.h>
 #include "sh_gfx.h"
 #include "sh_du_screen.h"
 #include "sh_du_layer.h"

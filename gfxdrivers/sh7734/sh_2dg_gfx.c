@@ -21,7 +21,7 @@
 #include <core/state.h>
 #include <core/surface_buffer.h>
 #include <gfx/convert.h>
-#include "modules/sh_2dg.h"
+#include <sh_2dg.h>
 #include "sh_gfx.h"
 #include "sh_2dg_gfx.h"
 #include "sh_2dg_reg.h"

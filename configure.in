@@ -2237,7 +2237,7 @@ gfxdrivers/unichrome/Makefile
 gfxdrivers/vdpau/Makefile
 gfxdrivers/vmware/Makefile
 gfxdrivers/sh7734/Makefile
-gfxdrivers/sh7734/modules/Makefile
+gfxdrivers/sh7734/kernel-module/Makefile
 
 inputdrivers/Makefile
 inputdrivers/dbox2remote/Makefile

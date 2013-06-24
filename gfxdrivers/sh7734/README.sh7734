@@ -1,11 +1,12 @@
 
-following environment variables are required for building DirectFB
+following variables are required for cross compiling
 
-PATH		path including directory to the cross compiler tools
+PATH		environment variables that specifies path including
+		directory to the cross compiler tools
 		[$(buildroot)/output/host/usr/bin:$(PATH)]
 DESTDIR		install directory prefix [$(buildroot)/output/staging]
 
-following environment variables are required for building kernel modues
+following variables are required for building kernel modues
 
 KERNELDIR	linux kernel source directory [$(linux)]
 ARCH		CPU archtecture [sh]
