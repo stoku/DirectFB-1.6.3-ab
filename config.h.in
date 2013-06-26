@@ -51,6 +51,9 @@
 /* The DirectFB version */
 #undef DIRECTFB_VERSION
 
+/* Vendor specific version */
+#undef DIRECTFB_VERSION_VENDOR
+
 /* Define to 1 if you have the <asm/page.h> header file. */
 #undef HAVE_ASM_PAGE_H
 
