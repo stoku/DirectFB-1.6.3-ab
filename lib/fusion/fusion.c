@@ -2935,6 +2935,10 @@ event_dispatcher_loop( DirectThread *thread, void *arg )
                          }
                     }
 
+                    if (reactor->call)
+                         reactor->call->handler( 1, msg->call_arg, msg->ptr,
+                                                 reactor->call->ctx, 0, &msg->ret_val );
+
                     pthread_mutex_unlock( &reactor->reactions_lock );
                }
                else if (msg->reaction == 2) {

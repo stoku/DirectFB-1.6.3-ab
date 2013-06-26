@@ -1804,10 +1804,17 @@ fusion_reactor_set_dispatch_callback( FusionReactor  *reactor,
                                       void           *call_ptr )
 {
      D_MAGIC_ASSERT( reactor, FusionReactor );
+     D_ASSERT( call != NULL );
+                 
+     if (reactor->destroyed)
+          return DR_DESTROYED;
 
-     D_UNIMPLEMENTED();
+     if (call_ptr)
+          return DR_UNIMPLEMENTED;
 
-     return DR_UNIMPLEMENTED;
+     reactor->call = call;
+
+     return DR_OK;
 }
 
 DirectResult

@@ -5217,7 +5217,10 @@ typedef enum {
      DIET_KEYRELEASE,              /* a key is been released */
      DIET_BUTTONPRESS,             /* a (mouse) button is been pressed */
      DIET_BUTTONRELEASE,           /* a (mouse) button is been released */
-     DIET_AXISMOTION               /* mouse/joystick movement */
+     DIET_AXISMOTION,              /* mouse/joystick movement */
+     /* ActBrain Extensions */
+     DIET_DEVICEADD,               /* hot-plug (plugged-in) */
+     DIET_DEVICEREMOVE             /* hot-plug (plugged-out) */
 } DFBInputEventType;
 
 /*

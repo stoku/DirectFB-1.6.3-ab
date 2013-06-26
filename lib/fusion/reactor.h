@@ -81,6 +81,7 @@ struct __Fusion_FusionReactor {
 
      FusionWorld      *world;
      bool              free;
+     FusionCall       *call;
 };
 #endif
 

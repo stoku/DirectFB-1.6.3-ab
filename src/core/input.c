@@ -926,6 +926,12 @@ dfb_input_event_type_name( DFBInputEventType type )
           case DIET_AXISMOTION:
                return "AXISMOTION";
 
+          case DIET_DEVICEADD:
+               return "DEVICEADD";
+
+          case DIET_DEVICEREMOVE:
+               return "DEVICEREMOVE";
+
           default:
                break;
      }
@@ -1732,6 +1738,13 @@ dfb_input_create_device(int device_index, CoreDFB *core_in, void *driver_in)
 #else
      local_processing_hotplug((const void *) &message, (void*) core_in);
 #endif
+
+     DFBInputEvent event;
+
+     memset( &event, 0, sizeof(event) );
+     event.type = DIET_DEVICEADD;
+     dfb_input_dispatch( device, &event );
+
      return DFB_OK;
 
 errorExit:
@@ -1768,6 +1781,14 @@ search_device_created(int device_index, void *driver_in)
      }
 
      return NULL;
+}
+
+static FusionCallHandlerResult
+unlock_mutex(int caller, int call_arg, void *call_ptr,
+             void *ctx, unsigned int serial, int *ret_val )
+{
+     direct_mutex_unlock( (DirectMutex *)ctx );
+     return FCHR_RETURN;
 }
 
 /*
@@ -1809,6 +1830,21 @@ dfb_input_remove_device(int device_index, void *driver_in)
           CoreInputHub_RemoveDevice( core_local->hub, device->shared->id );
 
      device->driver->nr_devices--;
+
+     DirectMutex mutex;
+     FusionCall call;
+
+     direct_mutex_init( &mutex );
+     direct_mutex_lock( &mutex );
+     fusion_call_init( &call, unlock_mutex, &mutex, device->core->world );
+     fusion_reactor_set_dispatch_callback( shared->reactor, &call, NULL );
+
+     DFBInputEvent event;
+
+     memset( &event, 0, sizeof(event) );
+     event.type = DIET_DEVICEREMOVE;
+     dfb_input_dispatch( device, &event );
+     direct_mutex_lock( &mutex ); /* wait until the event is processed */
 
      InputDeviceHotplugEvent    message;
 
@@ -1858,6 +1894,9 @@ dfb_input_remove_device(int device_index, void *driver_in)
      fusion_skirmish_destroy( &shared->lock );
 
      fusion_reactor_free( shared->reactor );
+     fusion_call_destroy( &call );
+     direct_mutex_unlock( &mutex );
+     direct_mutex_deinit( &mutex );
 
      if (shared->axis_info)
           SHFREE( pool, shared->axis_info );
