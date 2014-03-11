@@ -136,7 +136,7 @@ typedef struct {
 
      int                      num_inputs;
 
-     volatile void           *lcd_virt;
+     void                    *lcd_virt;
 
 
      /* for libshbeu */

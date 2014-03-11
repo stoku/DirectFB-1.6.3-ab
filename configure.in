@@ -30,7 +30,6 @@ AC_SUBST(DIRECTFB_MICRO_VERSION)
 AC_SUBST(DIRECTFB_INTERFACE_AGE)
 AC_SUBST(DIRECTFB_BINARY_AGE)
 AC_SUBST(DIRECTFB_VERSION)
-AC_SUBST(DIRECTFB_VERSION_VENDOR)
 
 AC_DEFINE_UNQUOTED(DIRECTFB_VERSION,"$DIRECTFB_VERSION",[The DirectFB version])
 
@@ -129,7 +128,7 @@ AM_CONDITIONAL(HAVE_MAN2HTML, test "$MAN2HTML" != "no")
 AC_PATH_TOOL(FLUXCOMP, fluxcomp)
 AC_SUBST(FLUXCOMP)
 if test -z "$FLUXCOMP"; then
-  if ! test -e src/core/CoreDFB.cpp; then
+  if ! test -e $srcdir/src/core/CoreDFB.cpp; then
     AC_MSG_ERROR([
 *** DirectFB compilation requires fluxcomp ***
 
@@ -2242,6 +2241,7 @@ gfxdrivers/pxa3xx/Makefile
 gfxdrivers/radeon/Makefile
 gfxdrivers/savage/Makefile
 gfxdrivers/sh772x/Makefile
+gfxdrivers/sh772x/kernel-module/Makefile
 gfxdrivers/sis315/Makefile
 gfxdrivers/tdfx/Makefile
 gfxdrivers/unichrome/Makefile

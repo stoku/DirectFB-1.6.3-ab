@@ -1,5 +1,7 @@
 ## Makefile.am for DirectFB/src/core/gfxcards/sh7722
 
+SUBDIRS = kernel-module
+
 EXTRA_DIST = \
 	directfbrc.sh7722		\
 	directfbrc.sh7723		\
@@ -11,7 +13,7 @@ EXTRA_DIST = \
 	kernel-module/sh7722.h		\
 	kernel-module/sh7723.c		\
 	kernel-module/sh7723.h		\
-	kernel-module/Makefile
+	kernel-module/Makefile.in
 
 INCLUDES = \
 	-I$(top_builddir)/include	\

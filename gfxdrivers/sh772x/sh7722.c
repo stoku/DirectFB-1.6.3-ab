@@ -97,7 +97,6 @@ driver_init_driver( CoreGraphicsDevice  *device,
                     void                *device_data,
                     CoreDFB             *core )
 {
-     DFBResult         ret;
      SH7722DriverData *sdrv = driver_data;
      SH7722DeviceData *sdev = device_data;
 
@@ -133,7 +132,7 @@ driver_init_driver( CoreGraphicsDevice  *device,
           return DFB_INIT;
      }
      /* libshbeu */
-     sdrv->shbeu = shbeu_open();
+     sdrv->shbeu = shbeu_open_named("BEU");
      if (!sdrv->shbeu) {
           D_PERROR( "SH772x/Driver: Could not initialize libshbeu" );
           munmap( (void*) sdrv->gfx_shared, direct_page_align( sizeof(SH772xGfxSharedArea) ) );

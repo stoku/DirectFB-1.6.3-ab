@@ -173,7 +173,8 @@ sh7722SetRegion( CoreLayer                  *layer,
                  CoreLayerRegionConfigFlags  updated,
                  CoreSurface                *surface,
                  CorePalette                *palette,
-                 CoreSurfaceBufferLock      *lock )
+                 CoreSurfaceBufferLock      *left_lock,
+                 CoreSurfaceBufferLock      *right_lock )
 {
      int                    n;
      SH7722DriverData      *sdrv = driver_data;
@@ -212,21 +213,21 @@ sh7722SetRegion( CoreLayer                  *layer,
 
           D_ASSERT( surface != NULL );
 
-          buffer = lock->buffer;
+          buffer = left_lock->buffer;
 
           D_ASSERT( buffer != NULL );
 
           /* Set buffer pitch. */
-          SH7722_SETREG32( sdrv, BMSMWR(n), lock->pitch );
+          SH7722_SETREG32( sdrv, BMSMWR(n), left_lock->pitch );
 
           /* Set buffer offset (Y plane or RGB packed). */
-          SH7722_SETREG32( sdrv, BMSAYR(n), lock->phys );
+          SH7722_SETREG32( sdrv, BMSAYR(n), left_lock->phys );
 
           /* Set buffer offset (UV plane). */
           if (DFB_PLANAR_PIXELFORMAT(buffer->format)) {
                D_ASSUME( buffer->format == DSPF_NV12 || buffer->format == DSPF_NV16 );
 
-               SH7722_SETREG32( sdrv, BMSACR(n), lock->phys + lock->pitch * surface->config.size.h );
+               SH7722_SETREG32( sdrv, BMSACR(n), left_lock->phys + left_lock->pitch * surface->config.size.h );
           }
      }
 
@@ -318,7 +319,8 @@ sh7722FlipRegion( CoreLayer             *layer,
                   void                  *region_data,
                   CoreSurface           *surface,
                   DFBSurfaceFlipFlags    flags,
-                  CoreSurfaceBufferLock *lock )
+                  CoreSurfaceBufferLock *left_lock,
+                  CoreSurfaceBufferLock *right_lock )
 {
      int                    n;
      CoreSurfaceBuffer     *buffer;
@@ -338,7 +340,7 @@ sh7722FlipRegion( CoreLayer             *layer,
      D_ASSERT( n >= 0 );
      D_ASSERT( n <= 3 );
 
-     buffer = lock->buffer;
+     buffer = left_lock->buffer;
      D_ASSERT( buffer != NULL );
 
      fusion_skirmish_prevail( &sdev->beu_lock );
@@ -347,16 +349,16 @@ sh7722FlipRegion( CoreLayer             *layer,
      BEU_Wait( sdrv, sdev );
 
      /* Set buffer pitch. */
-     SH7722_SETREG32( sdrv, BMSMWR(n), lock->pitch );
+     SH7722_SETREG32( sdrv, BMSMWR(n), left_lock->pitch );
 
      /* Set buffer offset (Y plane or RGB packed). */
-     SH7722_SETREG32( sdrv, BMSAYR(n), lock->phys );
+     SH7722_SETREG32( sdrv, BMSAYR(n), left_lock->phys );
 
      /* Set buffer offset (UV plane). */
      if (DFB_PLANAR_PIXELFORMAT(buffer->format)) {
           D_ASSUME( buffer->format == DSPF_NV12 || buffer->format == DSPF_NV16 );
 
-          SH7722_SETREG32( sdrv, BMSACR(n), lock->phys + lock->pitch * surface->config.size.h );
+          SH7722_SETREG32( sdrv, BMSACR(n), left_lock->phys + left_lock->pitch * surface->config.size.h );
      }
 
      /* Start operation! */
@@ -379,8 +381,10 @@ sh7722UpdateRegion( CoreLayer             *layer,
                     void                  *layer_data,
                     void                  *region_data,
                     CoreSurface           *surface,
-                    const DFBRegion       *update,
-                    CoreSurfaceBufferLock *lock )
+                    const DFBRegion       *left_update,
+                    CoreSurfaceBufferLock *left_lock,
+                    const DFBRegion       *right_update,
+                    CoreSurfaceBufferLock *right_lock )
 {
      SH7722DriverData *sdrv = driver_data;
      SH7722DeviceData *sdev = sdrv->dev;

@@ -30,8 +30,23 @@
 #include <asm/mach/irq.h>
 #endif
 
-#include <sh772x_gfx.h>
+#include "sh772x_gfx.h"
 
+#ifndef ctrl_inb
+#define ctrl_inb	__raw_readb
+#endif /* ctrl_inb */
+
+#ifndef ctrl_inw
+#define ctrl_inw	__raw_readw
+#endif /* ctrl_inw */
+
+#ifndef ctrl_outb
+#define ctrl_outb	__raw_writeb
+#endif /* ctrl_outb */
+
+#ifndef ctrl_outw
+#define ctrl_outw	__raw_writew
+#endif /* ctrl_outw */
 
 //#define SH7723GFX_DEBUG_2DG
 //#define SH7723GFX_IRQ_POLLER
@@ -335,9 +350,8 @@ sh7723_tdg_irq_poller( void *arg )
 
 /**********************************************************************************************************************/
 
-static int
-sh7723gfx_ioctl( struct inode  *inode,
-                 struct file   *filp,
+static long
+sh7723gfx_ioctl( struct file   *filp,
                  unsigned int   cmd,
                  unsigned long  arg )
 {
@@ -428,8 +442,8 @@ sh7723gfx_mmap( struct file           *file,
 /**********************************************************************************************************************/
 
 static struct file_operations sh7723gfx_fops = {
-     ioctl:    sh7723gfx_ioctl,
-     mmap:     sh7723gfx_mmap
+     unlocked_ioctl:    sh7723gfx_ioctl,
+     mmap:              sh7723gfx_mmap
 };
 
 static struct miscdevice sh7723gfx_miscdev = {

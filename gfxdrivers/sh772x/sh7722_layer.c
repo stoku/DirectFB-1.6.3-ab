@@ -195,9 +195,10 @@ sh7722SetRegion( CoreLayer                  *layer,
                  CoreLayerRegionConfigFlags  updated,
                  CoreSurface                *surface,
                  CorePalette                *palette,
-                 CoreSurfaceBufferLock      *lock )
+                 CoreSurfaceBufferLock      *left_lock,
+                 CoreSurfaceBufferLock      *right_lock )
 {
-     int               i, n;
+     int               n;
      SH7722DriverData *sdrv = driver_data;
      SH7722DeviceData *sdev = sdrv->dev;
      SH7722RegionData *sreg = region_data;
@@ -240,25 +241,25 @@ sh7722SetRegion( CoreLayer                  *layer,
 
      /* Update surface? */
      if (updated & CLRCF_SURFACE) {
-          CoreSurfaceBuffer *buffer = lock->buffer;
+          CoreSurfaceBuffer *buffer = left_lock->buffer;
 
           /* libshbeu: Set buffer pitch. */
-          sdev->shbeu_src[n].s.pitch = lock->pitch / DFB_BYTES_PER_PIXEL(buffer->format);
+          sdev->shbeu_src[n].s.pitch = left_lock->pitch / DFB_BYTES_PER_PIXEL(buffer->format);
 
           /* libshbeu: Set buffer offset (Y plane or RGB packed). */
-          sdev->shbeu_src[n].s.py = lock->addr;
+          sdev->shbeu_src[n].s.py = left_lock->addr;
           sdev->shbeu_src[n].s.pc = NULL;
           sdev->shbeu_src[n].s.pa = NULL;
 
           /* libshbeu: Set alpha plane to same physical address as RGB plane if layer uses alpha */
           if (DFB_PIXELFORMAT_HAS_ALPHA(buffer->format) && (config->options & DLOP_ALPHACHANNEL))
-               sdev->shbeu_src[n].s.pa = lock->addr;
+               sdev->shbeu_src[n].s.pa = left_lock->addr;
           
           /* Set buffer offset (UV plane). */
           if (DFB_PLANAR_PIXELFORMAT(buffer->format)) {
                D_ASSUME( buffer->format == DSPF_NV12 || buffer->format == DSPF_NV16 );
 
-               sdev->shbeu_src[n].s.pc = lock->addr + lock->pitch * surface->config.size.h;
+               sdev->shbeu_src[n].s.pc = left_lock->addr + left_lock->pitch * surface->config.size.h;
           }
 
           sreg->surface = surface;
@@ -397,10 +398,10 @@ sh7722FlipRegion( CoreLayer             *layer,
                   void                  *region_data,
                   CoreSurface           *surface,
                   DFBSurfaceFlipFlags    flags,
-                  CoreSurfaceBufferLock *lock )
+                  CoreSurfaceBufferLock *left_lock,
+                  CoreSurfaceBufferLock *right_lock )
 {
      int                n;
-     CoreSurfaceBuffer *buffer;
      SH7722DriverData  *sdrv = driver_data;
      SH7722DeviceData  *sdev = sdrv->dev;
      SH7722LayerData   *slay = layer_data;
@@ -416,14 +417,12 @@ sh7722FlipRegion( CoreLayer             *layer,
 
      D_ASSERT( n >= 0 );
      D_ASSERT( n <= 2 );
-
-     buffer = lock->buffer;
-     D_ASSERT( buffer != NULL );
+     D_ASSERT( lock->buffer != NULL );
 
      fusion_skirmish_prevail( &sdev->beu_lock );
 
      /* set new physical address for layer */
-     sdev->shbeu_src[n].s.py = lock->addr;
+     sdev->shbeu_src[n].s.py = left_lock->addr;
 
      /* libshbeu: reorder src surfaces and start blending. */
      if (sdev->input_mask) {
@@ -457,8 +456,10 @@ sh7722UpdateRegion( CoreLayer             *layer,
                     void                  *layer_data,
                     void                  *region_data,
                     CoreSurface           *surface,
-                    const DFBRegion       *update,
-                    CoreSurfaceBufferLock *lock )
+                    const DFBRegion       *left_update,
+                    CoreSurfaceBufferLock *left_lock,
+                    const DFBRegion       *right_update,
+                    CoreSurfaceBufferLock *right_lock)
 {
      SH7722DriverData *sdrv = driver_data;
      SH7722DeviceData *sdev = sdrv->dev;

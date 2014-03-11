@@ -26,7 +26,7 @@
 #include <asm/io.h>
 #include <asm/uaccess.h>
 
-#include <sh772x_gfx.h>
+#include "sh772x_gfx.h"
 
 
 //#define SH7722GFX_DEBUG_2DG
@@ -880,13 +880,12 @@ sh7722gfx_flush( struct file *filp,
      return 0;
 }
 
-static int
-sh7722gfx_ioctl( struct inode  *inode,
-                 struct file   *filp,
+static long
+sh7722gfx_ioctl( struct file   *filp,
                  unsigned int   cmd,
                  unsigned long  arg )
 {
-     int            ret;
+     long           ret;
      SH772xRegister reg;
      SH7722JPEG     jpeg;
 
@@ -996,9 +995,9 @@ sh7722gfx_mmap( struct file           *file,
 /**********************************************************************************************************************/
 
 static struct file_operations sh7722gfx_fops = {
-     flush:    sh7722gfx_flush,
-     ioctl:    sh7722gfx_ioctl,
-     mmap:     sh7722gfx_mmap
+     flush:             sh7722gfx_flush,
+     unlocked_ioctl:    sh7722gfx_ioctl,
+     mmap:              sh7722gfx_mmap
 };
 
 static struct miscdevice sh7722gfx_miscdev = {

@@ -59,6 +59,7 @@ DIST_COMMON = README $(am__configure_deps) $(srcdir)/Makefile.am \
 	$(srcdir)/directfb-config.in $(srcdir)/directfb-internal.pc.in \
 	$(srcdir)/directfb.pc.in $(srcdir)/directfb.spec.in \
 	$(top_srcdir)/configure \
+	$(top_srcdir)/gfxdrivers/sh772x/kernel-module/Makefile.in \
 	$(top_srcdir)/gfxdrivers/sh7734/kernel-module/Makefile.in \
 	AUTHORS COPYING ChangeLog INSTALL NEWS TODO compile \
 	config.guess config.sub depcomp install-sh ltmain.sh missing
@@ -74,7 +75,8 @@ am__CONFIG_DISTCLEAN_FILES = config.status config.cache config.log \
 mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = config.h
 CONFIG_CLEAN_FILES = directfb-config directfb.pc directfb-internal.pc \
-	directfb.spec gfxdrivers/sh7734/kernel-module/Makefile
+	directfb.spec gfxdrivers/sh772x/kernel-module/Makefile \
+	gfxdrivers/sh7734/kernel-module/Makefile
 CONFIG_CLEAN_VPATH_FILES =
 am__vpath_adj_setup = srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`;
 am__vpath_adj = case $$p in \
@@ -506,6 +508,8 @@ directfb.pc: $(top_builddir)/config.status $(srcdir)/directfb.pc.in
 directfb-internal.pc: $(top_builddir)/config.status $(srcdir)/directfb-internal.pc.in
 	cd $(top_builddir) && $(SHELL) ./config.status $@
 directfb.spec: $(top_builddir)/config.status $(srcdir)/directfb.spec.in
+	cd $(top_builddir) && $(SHELL) ./config.status $@
+gfxdrivers/sh772x/kernel-module/Makefile: $(top_builddir)/config.status $(top_srcdir)/gfxdrivers/sh772x/kernel-module/Makefile.in
 	cd $(top_builddir) && $(SHELL) ./config.status $@
 gfxdrivers/sh7734/kernel-module/Makefile: $(top_builddir)/config.status $(top_srcdir)/gfxdrivers/sh7734/kernel-module/Makefile.in
 	cd $(top_builddir) && $(SHELL) ./config.status $@
